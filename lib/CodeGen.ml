@@ -2,58 +2,88 @@ module IntMap = Map.Make (Int)
 module SymbolMap = Map.Make (Automaton.Symbol)
 
 let action_lib =
-  "  let _kw_endpos ~loc _ =\n\
-  \    match loc with\n\
-  \    | l :: _ -> snd l\n\
-  \    | [] -> Lexing.dummy_pos\n\
-  \  ;;\n\n\
-  \  let _kw_startpos ~loc n =\n\
-  \    match List.nth_opt loc (n - 1) with\n\
-  \    | Some l -> fst l\n\
-  \    | None -> _kw_endpos ~loc n\n\
-  \  ;;\n\n\
-  \  let _kw_symbolstartpos ~loc:_ _ = failwith \"unimplemented: $symbolstartpos\"\n\
-  \  let _kw_startofs ~loc:_ _ = failwith \"unimplemented: $startofs\"\n\
-  \  let _kw_endofs ~loc:_ _ = failwith \"unimplemented: $endofs\"\n\
-  \  let _kw_symbolstartofs ~loc:_ _ = failwith \"unimplemented: $symbolstartofs\"\n\
-  \  let _kw_loc ~loc n = _kw_startpos ~loc n, _kw_endpos ~loc n\n\
-  \  let _kw_sloc ~loc:_ _ = failwith \"unimplemented: $sloc\"\n"
+  "  implicit `loc\n\
+  \  implicit `error {E_err} : Parsing.Error E_err\n\n\
+  \  pub let _kw_endpos _ =\n\
+  \    match `loc with\n\
+  \    | l :: _ => snd l\n\
+  \    | [] => Parsing.dummyPos\n\
+  \    end\n\n\
+  \  pub let _kw_startpos (n : Int) =\n\
+  \    match Utils.nth_opt `loc (n - 1) with\n\
+  \    | Some l => fst l\n\
+  \    | None => _kw_endpos n\n\
+  \    end\n\n\
+  \  pub let _kw_symbolstartpos _ = Parsing.error \"unimplemented: $symbolstartpos\"\n\
+  \  pub let _kw_startofs _ = Parsing.error \"unimplemented: $startofs\"\n\
+  \  pub let _kw_endofs _ = Parsing.error \"unimplemented: $endofs\"\n\
+  \  pub let _kw_symbolstartofs _ = Parsing.error \"unimplemented: $symbolstartofs\"\n\
+  \  pub let _kw_loc n = _kw_startpos n, _kw_endpos n\n\
+  \  pub let _kw_sloc _ = Parsing.error \"unimplemented: $sloc\"
+  \n"
 ;;
 
 let state_lib =
-  "  let lexfun = ref (fun _ -> assert false)\n\
-  \  let lexbuf = ref (Lexing.from_string String.empty)\n\
-  \  let peeked = ref None\n\
-  \  let lexbuf_fallback_p = ref Lexing.dummy_pos\n\n\
-  \  let setup lf lb =\n\
-  \    lexfun := lf;\n\
-  \    lexbuf := lb;\n\
-  \    peeked := None;\n\
-  \    lexbuf_fallback_p := !lexbuf.lex_curr_p\n\
-  \  ;;\n\n\
-  \  let shift () =\n\
-  \    let sym = Option.get !peeked in\n\
-  \    peeked := None;\n\
-  \    lexbuf_fallback_p := !lexbuf.lex_curr_p;\n\
-  \    sym\n\
-  \  ;;\n\n\
-  \  let lookahead () =\n\
-  \    match !peeked with\n\
-  \    | Some (tok, _) -> tok\n\
-  \    | None ->\n\
-  \      let tok = !lexfun !lexbuf\n\
-  \      and loc = !lexbuf.lex_start_p, !lexbuf.lex_curr_p in\n\
-  \      peeked := Some (tok, loc);\n\
-  \      tok\n\
-  \  ;;\n\n\
-  \  let loc_shift ~loc l = l :: loc\n\n\
-  \  let loc_reduce ~loc = function\n\
-  \    | 0 -> (!lexbuf_fallback_p, !lexbuf_fallback_p) :: loc\n\
-  \    | n ->\n\
-  \      let rec skip n xs = if n = 0 then xs else skip (n - 1) (List.tl xs) in\n\
-  \      let l = fst (List.nth loc (n - 1)), snd (List.hd loc) in\n\
-  \      l :: skip n loc\n\
-  \  ;;\n\n"
+ "  let lexfun {E_err, E_st, R_lex,\n\
+ \               `error : Parsing.Error E_err,\n\
+ \     	  `st : State2 E_st,\n\
+ \     	  `lex : Parsing.Lex R_lex Tok} () = \n\
+ \     let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+ \     fn () => `lex.token ()\n\
+ \     in aux ()\n\n\
+ \   let shift {E_err, E_st, R_lex,\n\
+ \     	 `error : Parsing.Error E_err,\n\
+ \     	 `st : State2 E_st,\n\
+ \     	 `lex : Parsing.Lex R_lex Tok} () = \n\
+ \     let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
+ \     (fn () => \n\
+ \         let sym = Utils.optionGet {`re = (fn () => Parsing.error \"option\")}\n\
+ \     			      (getPeeked ()) in\n\
+ \         let () = setPeeked None in\n\
+ \         let () = setFallback (`lex.curPos ()) in\n\
+ \         sym)\n\
+ \     in aux ()\n\n\
+ \   let lookahead {E_err, E_st, R_lex,\n\
+ \     	     `error : Parsing.Error E_err,\n\
+ \     	     `st : State2 E_st,\n\
+ \     	     `lex : Parsing.Lex R_lex Tok} () = \n\
+ \     let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+ \     (fn () => \n\
+ \         match getPeeked () with\n\
+ \         | Some (tok, _) => tok\n\
+ \         | None =>\n\
+ \           let tok = lexfun () in\n\
+ \           let loc = `lex.startPos (), `lex.curPos () in\n\
+ \           let () = setPeeked (Some (tok, loc)) in\n\
+ \           tok\n\
+ \         end)\n\
+ \     in aux ()\n\n\
+ \   implicit `loc\n\
+ \   let loc_shift l = l :: `loc\n\n\
+ \   let loc_reduce {E_err, E_st, R_lex,\n\
+ \     	      `error : Parsing.Error E_err,\n\
+ \     	      `st : State2 E_st,\n\
+ \     	      `lex : Parsing.Lex R_lex Tok} n =\n\
+ \     let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
+ \     (fn (n : Int) =>\n\
+ \         if n == 0 then (getFallback (), getFallback ()) :: `loc\n\
+ \         else\n\
+ \           (let rec skip (n : Int) xs =\n\
+ \     	 if n == 0 then xs\n\
+ \     	 else skip (n - 1)\n\
+ \     		   (Utils.tl {`re = (fn () => Parsing.error \"tl\")}\n\
+ \     			     xs) in\n\
+ \            let l = (fst (Utils.nth {`re = (fn () => Parsing.error \"nth\")}\n\
+ \     			      `loc\n\
+ \     			      (n - 1)),\n\
+ \     		snd (Utils.hd {`re = (fn () => Parsing.error \"hd\")}\n\
+ \     			      `loc)) in\n\
+ \            l :: skip n `loc))\n\
+ \     in aux n\n\n\
+ \   implicit `lex {R_lex} : Parsing.Lex R_lex Tok\n\
+ \   implicit `st {E_st} : State2 E_st\n\
+ \   implicit `error {E_err} : Parsing.Error E_err\n\
+ \n"
 ;;
 
 let iteri2 f xs ys =
@@ -89,7 +119,7 @@ struct
     |> String.concat ("\n" ^ i)
   ;;
 
-  let letrec ?(pre = "let rec") ?(pre' = "and") ?(post = "") ?(post' = " in") f xs =
+  let letrec ?(pre = "rec let") ?(pre' = "let") ?(post = "") ?(post' = " end in") f xs =
     let rec loop i = function
       | [] -> ()
       | x :: xs ->
@@ -158,7 +188,8 @@ struct
     else Format.fprintf f "%s" (term_name t)
   ;;
 
-  let write_term_patterns f ts =
+  (* This function is now obsolete because DBL has no disjunctions of patterns. *)
+  let _write_term_patterns f ts =
     let f sym = Format.fprintf f "| %t " (fun f -> write_term_pattern f false sym) in
     TermSet.iter f ts
   ;;
@@ -166,7 +197,6 @@ struct
   let write_goto_call f state sym =
     let closure = state.s_kernel @ state.s_closure in
     write_state_id f (SymbolMap.find sym state.s_goto);
-    if S.locations then Format.fprintf f " ~loc";
     if symbol_has_value sym then Format.fprintf f " x";
     write_arg_ids f (List.find (shifts_group sym) closure).g_prefix;
     write_cont_ids f (shifts_group sym) (state.s_kernel @ state.s_closure)
@@ -178,7 +208,7 @@ struct
       f
       "%t%s x = %t"
       (fun f -> write_cont_id f group idx)
-      (if S.locations then " ~loc" else "")
+      (if S.locations then " {`loc}" else "") 
       (fun f -> write_goto_call f state sym)
   ;;
 
@@ -190,18 +220,17 @@ struct
       let action = IntMap.find i_action A.automaton.a_actions in
       Format.fprintf
         f
-        " Actions.%t%s%t ()"
+        " Actions.%t%t ()"
         (fun f -> write_semantic_action_id f action i_action)
-        (if S.locations then " ~loc" else "")
         (fun f -> write_arg_ids f group.g_prefix)
   ;;
 
   let write_action_shift f state sym =
-    let write_loc_update f = Format.fprintf f " in\n      let loc = loc_shift ~loc _l" in
+    let write_loc_update f = Format.fprintf f " in\n      let `loc = loc_shift _l" in
     if S.comments then Format.fprintf f "    (* Shift *)\n";
     Format.fprintf
       f
-      "    | %t ->\n      let _, _l = shift ()%t in\n      %t\n"
+      "    | %t =>\n      let (_, _l) = shift ()%t in\n      %t\n"
       (fun f -> write_term_pattern f true sym)
       (fun f -> if S.locations then write_loc_update f)
       (fun f -> write_goto_call f state (Term sym))
@@ -209,20 +238,21 @@ struct
 
   let write_action_reduce f state lookahead i j =
     let write_loc_update f n =
-      Format.fprintf f "\n      and loc = loc_reduce ~loc %d" n
+      Format.fprintf f "\n      in let `loc = loc_reduce %d" n
     in
     if S.comments then Format.fprintf f "    (* Reduce *)\n";
     let group = List.nth (state.s_kernel @ state.s_closure) i in
     let n = List.length group.g_prefix
     and item = List.nth group.g_items j in
-    Format.fprintf
-      f
-      "    %t->\n      let x =%t%t in\n      %t%s x\n"
-      (fun f -> write_term_patterns f lookahead)
-      (fun f -> write_semantic_action_call f group item)
-      (fun f -> if S.locations then write_loc_update f n)
-      (fun f -> write_cont_id f group i)
-      (if S.locations then " ~loc" else "")
+    TermSet.iter (fun sym ->
+		    Format.fprintf
+		      f
+		      "    | %t =>\n      let x =%t%t in\n      %t x\n"
+		      (fun f -> write_term_pattern f false sym)
+		      (fun f -> write_semantic_action_call f group item)
+		      (fun f -> if S.locations then write_loc_update f n)
+		      (fun f -> write_cont_id f group i))
+		 lookahead
   ;;
 
   let write_action f state lookahead = function
@@ -233,7 +263,7 @@ struct
   let write_actions f state =
     Format.fprintf f "    match lookahead () with\n";
     List.iter (fun (l, m) -> write_action f state l m) state.s_action;
-    Format.fprintf f "    | _ -> raise Error\n"
+    Format.fprintf f "    | _ => Parsing.error \"\"\n    end\n"
   ;;
 
   let write_actions_starting f state =
@@ -265,7 +295,7 @@ struct
     and cmp a b = String.compare b.ti_name.data a.ti_name.data in
     let infos = List.filter_map get_info symbols in
     let infos = List.fast_sort cmp infos in
-    Format.fprintf f "type token =\n";
+    Format.fprintf f "pub data Tok =\n";
     List.iter (write_term_cons f) infos;
     Format.fprintf f "\n"
   ;;
@@ -283,14 +313,14 @@ struct
          | Some (Some a) -> a
          | Some None -> Printf.sprintf "_arg%d" i
          | None -> "()")
-      | Ast.KwStartpos -> Printf.sprintf "_kw_startpos ~loc:_loc %d" n
-      | Ast.KwEndpos -> Printf.sprintf "_kw_endpos ~loc:_loc %d" n
-      | Ast.KwSymbolstartpos -> Printf.sprintf "_kw_symbolstartpos ~loc:_loc %d" n
-      | Ast.KwStartofs -> Printf.sprintf "_kw_startofs ~loc:_loc %d" n
-      | Ast.KwEndofs -> Printf.sprintf "_kw_endofs ~loc:_loc %d" n
-      | Ast.KwSymbolstartofs -> Printf.sprintf "_kw_symbolstartofs ~loc:_loc %d" n
-      | Ast.KwLoc -> Printf.sprintf "_kw_loc ~loc:_loc %d" n
-      | Ast.KwSloc -> Printf.sprintf "_kw_sloc ~loc:_loc %d" n
+      | Ast.KwStartpos -> Printf.sprintf "_kw_startpos %d" n
+      | Ast.KwEndpos -> Printf.sprintf "_kw_endpos %d" n
+      | Ast.KwSymbolstartpos -> Printf.sprintf "_kw_symbolstartpos %d" n
+      | Ast.KwStartofs -> Printf.sprintf "_kw_startofs %d" n
+      | Ast.KwEndofs -> Printf.sprintf "_kw_endofs %d" n
+      | Ast.KwSymbolstartofs -> Printf.sprintf "_kw_symbolstartofs %d" n
+      | Ast.KwLoc -> Printf.sprintf "_kw_loc %d" n
+      | Ast.KwSloc -> Printf.sprintf "_kw_sloc %d" n
     in
     let rec loop pos = function
       | [] -> write_part f pos (snd code.loc)
@@ -311,7 +341,6 @@ struct
       | None -> Format.fprintf f " _arg%d" (List.length action.sa_args - i)
     in
     write_semantic_action_id f action id;
-    if S.locations then Format.fprintf f " ~loc:_loc";
     iteri2 iter (List.rev item.i_suffix) (List.rev action.sa_args);
     Format.fprintf f " () = %t" (fun f -> write_semantic_action_code f action)
   ;;
@@ -333,7 +362,7 @@ struct
       f
       "%t%s%t%t =\n"
       (fun f -> write_state_id f id)
-      (if S.locations then " ~loc" else "")
+      (if S.locations then " {`loc}" else "")
       (fun f -> write_arg_ids f (List.hd state.s_kernel).g_prefix)
       (fun f -> write_cont_ids f (fun _ -> true) state.s_kernel)
   ;;
@@ -359,44 +388,64 @@ struct
   let write_entry f symbol id =
     Format.fprintf
       f
-      "let %s lexfun lexbuf =\n\
-      \  States.setup lexfun lexbuf;\n\
-      \  States.%t%s (fun x -> x)\n\
-       ;;\n"
+      "pub let %s {`lex} () =\n\
+      \  handle `error = Parsing.Error (effect x / _ => Utils.Left x)\n\
+      \    return x => Utils.Right x in\n\
+      \  handle `st = State2\n\
+      \    { setPeeked = effect p / r => fn _ f => r () p f\n\
+      \    , getPeeked = effect () / r => fn p f => r p p f\n\
+      \    , setFallback = effect f / r => fn p _ => r () p f\n\
+      \    , getFallback = effect () / r => fn p f => r f p f }\n\
+      \    return x => fn _ _ => x\n\
+      \    finally f => f None Parsing.dummyPos in\n\
+      \  States.%t%s (fn x => x)\n\
+      \n"
       (nterm_name symbol)
       (fun f -> write_state_id f id)
-      (if S.locations then " ~loc:[]" else "")
+      (if S.locations then " {`loc = []}" else "")
   ;;
 
   let write f =
     let write_semantic_action f id a =
-      Format.fprintf f "  let %t\n" (fun f -> write_semantic_action f id a)
+      Format.fprintf f "  pub let %t\n" (fun f -> write_semantic_action f id a)
     and write_state f _ (id, s) pre post =
       if S.comments then write_state_comment f s;
       Format.fprintf f "  %s %t%s" pre (fun f -> write_state f id s) post
     and write_entry f (nt, s) = write_entry f nt s
-    and state_letrec = letrec ~post:"\n" ~post':"  ;;\n" in
+    and state_letrec = letrec ~pre:"pub rec let" ~post:"\n" ~post':"end  \n" in
     (* -unused-rec-flag due continuations always being mutually recursive, while often they don't need to *)
     (* FIXME: should we include -redunant-{case, subpat}? They trigger warnings
        in grammars with unresolved conflicts, but maybe it's a good thing? *)
     Format.fprintf
       f
-      "[@@@@@@warning \"-unused-rec-flag\"]\n\
-       [@@@@@@warning \"-redundant-case\"]\n\
-       [@@@@@@warning \"-redundant-subpat\"]\n\n\
+      "import Parsing\n\
+       import Utils\n\
+       implicit `error {E_err} : Parsing.Error E_err\n\
        %t\n\n\
-       exception Error\n\n\
-       %tmodule Actions = struct\n\
+       %tdata State2 (effect E) = State2 of\n\
+       \  { setPeeked : Option (Pair Tok (Pair Parsing.Pos Parsing.Pos)) ->[E] Unit\n\
+       \  , setFallback : Parsing.Pos ->[E] Unit\n\
+       \  , getPeeked : Unit ->[E] Option (Pair Tok (Pair Parsing.Pos Parsing.Pos))\n\
+       \  , getFallback : Unit ->[E] Parsing.Pos }\n\n\
+       method setPeeked {E, self = State2 {setPeeked} : State2 E} = setPeeked\n\
+       method getPeeked {E, self = State2 {getPeeked} : State2 E} = getPeeked\n\
+       method setFallback {E, self = State2 {setFallback} : State2 E} = setFallback\n\
+       method getFallback {E, self = State2 {getFallback} : State2 E} = getFallback\n\n\
+       let setPeeked {E, `st : State2 E} p = `st.setPeeked p\n\
+       let getPeeked {E, `st : State2 E} () = `st.getPeeked ()\n\
+       let setFallback {E, `st : State2 E} f = `st.setFallback f\n\
+       let getFallback {E, `st : State2 E} () = `st.getFallback ()\n\n\
+       module Actions\n\
        %s%tend\n\n\
-       module States = struct\n\
+       module States\n\
        %s%tend\n\n\
-       %t"
+       %t" 
       (fun f -> write_string f A.automaton.a_header)
       (fun f -> write_term_type f G.symbols)
       action_lib
-      (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions)
+      (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions) (* FIXME: rec blocks are not indented *)
       state_lib
-      (fun f -> IntMap.bindings A.automaton.a_states |> state_letrec (write_state f))
+      (fun f -> IntMap.bindings A.automaton.a_states |> state_letrec (write_state f)) (* FIXME: rec blocks are not indented *)
       (fun f -> List.iter (write_entry f) A.automaton.a_starting)
   ;;
 end

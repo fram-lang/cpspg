@@ -1,0 +1,22 @@
+pub data Pos = Pos of
+    { fname : String
+    , lnum : Int
+    , bol : Int
+    , cnum : Int }
+
+pub let dummyPos = Pos {fname = "", lnum = 0, bol = 0, cnum = 0-1}
+
+pub data Lex R Tok = Lex of
+    { token  : Unit ->[|R] Tok
+    , startPos : Unit ->[|R] Pos
+    , curPos : Unit -> [|R] Pos }
+
+pub method token {R, Tok, self = Lex {token} : Lex R Tok} = token 
+pub method startPos {R, Tok, self = Lex {startPos} : Lex R Tok} = startPos 
+pub method curPos {R, Tok, self = Lex {curPos} : Lex R Tok} = curPos 
+
+pub data Error (effect E) = Error of ({type X} -> String ->[E] X)
+pub method parseError {E, self = Error f : Error E} = f
+
+pub let error {E, `error : Error E} s = `error.parseError s
+
