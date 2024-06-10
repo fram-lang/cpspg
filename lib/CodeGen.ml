@@ -10,7 +10,7 @@ let action_lib =
   \    | [] => Parsing.dummyPos\n\
   \    end\n\n\
   \  pub let _kw_startpos (n : Int) =\n\
-  \    match Utils.nth_opt `loc (n - 1) with\n\
+  \    match List.nth `loc (n - 1) with\n\
   \    | Some l => fst l\n\
   \    | None => _kw_endpos n\n\
   \    end\n\n\
@@ -25,64 +25,64 @@ let action_lib =
 
 let state_lib =
  "  let lexfun {E_err, E_st, R_lex,\n\
- \               `error : Parsing.Error E_err,\n\
- \     	  `st : State2 E_st,\n\
- \     	  `lex : Parsing.Lex R_lex Tok} () = \n\
- \     let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
- \     fn () => `lex.token ()\n\
- \     in aux ()\n\n\
- \   let shift {E_err, E_st, R_lex,\n\
- \     	 `error : Parsing.Error E_err,\n\
- \     	 `st : State2 E_st,\n\
- \     	 `lex : Parsing.Lex R_lex Tok} () = \n\
- \     let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
- \     (fn () => \n\
- \         let sym = Utils.optionGet {`re = (fn () => Parsing.error \"option\")}\n\
- \     			      (getPeeked ()) in\n\
- \         let () = setPeeked None in\n\
- \         let () = setFallback (`lex.curPos ()) in\n\
- \         sym)\n\
- \     in aux ()\n\n\
- \   let lookahead {E_err, E_st, R_lex,\n\
- \     	     `error : Parsing.Error E_err,\n\
- \     	     `st : State2 E_st,\n\
- \     	     `lex : Parsing.Lex R_lex Tok} () = \n\
- \     let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
- \     (fn () => \n\
- \         match getPeeked () with\n\
- \         | Some (tok, _) => tok\n\
- \         | None =>\n\
- \           let tok = lexfun () in\n\
- \           let loc = `lex.startPos (), `lex.curPos () in\n\
- \           let () = setPeeked (Some (tok, loc)) in\n\
- \           tok\n\
- \         end)\n\
- \     in aux ()\n\n\
- \   implicit `loc\n\
- \   let loc_shift l = l :: `loc\n\n\
- \   let loc_reduce {E_err, E_st, R_lex,\n\
- \     	      `error : Parsing.Error E_err,\n\
- \     	      `st : State2 E_st,\n\
- \     	      `lex : Parsing.Lex R_lex Tok} n =\n\
- \     let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
- \     (fn (n : Int) =>\n\
- \         if n == 0 then (getFallback (), getFallback ()) :: `loc\n\
- \         else\n\
- \           (let rec skip (n : Int) xs =\n\
- \     	 if n == 0 then xs\n\
- \     	 else skip (n - 1)\n\
- \     		   (Utils.tl {`re = (fn () => Parsing.error \"tl\")}\n\
- \     			     xs) in\n\
- \            let l = (fst (Utils.nth {`re = (fn () => Parsing.error \"nth\")}\n\
- \     			      `loc\n\
- \     			      (n - 1)),\n\
- \     		snd (Utils.hd {`re = (fn () => Parsing.error \"hd\")}\n\
- \     			      `loc)) in\n\
- \            l :: skip n `loc))\n\
- \     in aux n\n\n\
- \   implicit `lex {R_lex} : Parsing.Lex R_lex Tok\n\
- \   implicit `st {E_st} : State2 E_st\n\
- \   implicit `error {E_err} : Parsing.Error E_err\n\
+ \              `error : Parsing.Error E_err,\n\
+ \              `st : State2 E_st,\n\
+ \              `lex : Parsing.Lex R_lex Tok} () = \n\
+ \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+ \    fn () => `lex.token ()\n\
+ \    in aux ()\n\n\
+ \  let shift {E_err, E_st, R_lex,\n\
+ \             `error : Parsing.Error E_err,\n\
+ \             `st : State2 E_st,\n\
+ \             `lex : Parsing.Lex R_lex Tok} () = \n\
+ \    let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
+ \      (fn () => \n\
+ \        let sym = Utils.optionGet {`re = (fn () => Parsing.error \"option\")}\n\
+ \     			            (getPeeked ()) in\n\
+ \        let () = setPeeked None in\n\
+ \        let () = setFallback (`lex.curPos ()) in\n\
+ \        sym)\n\
+ \    in aux ()\n\n\
+ \  let lookahead {E_err, E_st, R_lex,\n\
+ \                 `error : Parsing.Error E_err,\n\
+ \                 `st : State2 E_st,\n\
+ \                 `lex : Parsing.Lex R_lex Tok} () = \n\
+ \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+ \      (fn () => \n\
+ \        match getPeeked () with\n\
+ \        | Some (tok, _) => tok\n\
+ \        | None =>\n\
+ \          let tok = lexfun () in\n\
+ \          let loc = `lex.startPos (), `lex.curPos () in\n\
+ \          let () = setPeeked (Some (tok, loc)) in\n\
+ \          tok\n\
+ \        end)\n\
+ \    in aux ()\n\n\
+ \  implicit `loc\n\
+ \  let loc_shift l = l :: `loc\n\n\
+ \  let loc_reduce {E_err, E_st, R_lex,\n\
+ \                  `error : Parsing.Error E_err,\n\
+ \                  `st : State2 E_st,\n\
+ \                  `lex : Parsing.Lex R_lex Tok} n =\n\
+ \    let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
+ \      (fn (n : Int) =>\n\
+ \        if n == 0 then (getFallback (), getFallback ()) :: `loc\n\
+ \        else\n\
+ \          (let rec skip (n : Int) xs =\n\
+ \     	      if n == 0 then xs\n\
+ \     	      else skip (n - 1)\n\
+ \     		        (List.tlErr {`onError = (fn () => Parsing.error \"tl\")}\n\
+ \     			            xs) in\n\
+ \           let l = (fst (List.nthErr {`onError = (fn () => Parsing.error \"nth\")}\n\
+ \     			               `loc\n\
+ \     			               (n - 1)),\n\
+ \     	              snd (List.hdErr {`onError = (fn () => Parsing.error \"hd\")}\n\
+ \     			              `loc)) in\n\
+ \           l :: skip n `loc))\n\
+ \    in aux n\n\n\
+ \  implicit `lex {R_lex} : Parsing.Lex R_lex Tok\n\
+ \  implicit `st {E_st} : State2 E_st\n\
+ \  implicit `error {E_err} : Parsing.Error E_err\n\
  \n"
 ;;
 
@@ -389,8 +389,8 @@ struct
     Format.fprintf
       f
       "pub let %s {`lex} () =\n\
-      \  handle `error = Parsing.Error (effect x / _ => Utils.Left x)\n\
-      \    return x => Utils.Right x in\n\
+      \  handle `error = Parsing.Error (effect x / _ => Left x)\n\
+      \    return x => Right x in\n\
       \  handle `st = State2\n\
       \    { setPeeked = effect p / r => fn _ f => r () p f\n\
       \    , getPeeked = effect () / r => fn p f => r p p f\n\
@@ -420,6 +420,7 @@ struct
       f
       "import Parsing\n\
        import Utils\n\
+       import List\n\
        implicit `error {E_err} : Parsing.Error E_err\n\
        %t\n\n\
        %tdata State2 (effect E) = State2 of\n\

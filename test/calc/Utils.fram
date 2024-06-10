@@ -1,43 +1,13 @@
-pub data Either X Y = 
-    | Left of X
-    | Right of Y
+(* This file contains useful functions that arguably (i.e., in comparison
+ * with OCaml) belong in the standard library but have not been included
+ * in it yet. It should eventually fall out of use.
+ * 
+ * Nonetheless, as long as it hasn't, it should be placed in the same directory
+ * as the generated parser. *)
 
 pub let optionGet {`re : {type X} -> Unit ->[|_] X} opt = 
     match opt with
     | None => `re ()
     | Some x => x
     end
-
-pub let nth_opt xs (n : Int) = 
-    let rec aux xs (n : Int) = 
-	match xs with 
-	| [] => None
-	| x :: xs => 
-	    if n == 0 then
-		Some x
-	    else aux xs (n - 1)
-	end
-    in if n < 0 then None else aux xs n
-
-pub let hd {`re : {type X} -> Unit ->[|_] X} xs = 
-    match xs with
-    | [] => `re ()
-    | x :: _ => x
-    end
-
-pub let tl {`re : {type X} -> Unit ->[|_] X} xs = 
-    match xs with
-    | [] => `re ()
-    | _ :: xs => xs
-    end
-
-pub let nth {`re : {type X} -> Unit ->[|_] X} xs (n : Int) = 
-    let rec aux xs (n : Int) =
-	match xs with 
-	| [] => `re ()
-	| x :: xs => 
-	    if n == 0 then x
-	    else aux xs (n - 1)
-	end
-    in if n < 0 then `re () else aux xs n
 

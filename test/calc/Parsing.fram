@@ -1,3 +1,6 @@
+(* This file should be placed in the same directory as the generated
+ * parser *)
+
 pub data Pos = Pos of
     { fname : String
     , lnum : Int
@@ -18,5 +21,9 @@ pub method curPos {R, Tok, self = Lex {curPos} : Lex R Tok} = curPos
 pub data Error (effect E) = Error of ({type X} -> String ->[E] X)
 pub method parseError {E, self = Error f : Error E} = f
 
+(** Error-reporting function. Use this function to report errors
+    in semantic actions. If an error is reported, the result
+    returned by the parser will be the passed string wrapped in
+    a `Left` constructor. *)
 pub let error {E, `error : Error E} s = `error.parseError s
 
