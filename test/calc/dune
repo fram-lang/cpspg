@@ -1,20 +1,10 @@
-(executable
- (name calc))
-
-(ocamllex Lexer)
-
 (rule
- ; Change this rule to use a different parser
- (copy ParserPrec.ml Parser.ml))
-
-(rule
- (deps ParserBase.mly)
- (target ParserBase.ml)
+ (deps Parser.mly)
+ (target Parser.fram)
  (action
   (run cpspg -o %{target} %{deps})))
 
 (rule
- (deps ParserPrec.mly)
- (target ParserPrec.ml)
- (action
-  (run cpspg -o %{target} %{deps})))
+  (alias runtest)
+  (deps Calc.fram Parser.fram (source_tree ../../framtools))
+  (action (run dbl -I ../../framtools Calc.fram)))
