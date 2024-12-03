@@ -2,15 +2,15 @@ module IntMap = Map.Make (Int)
 module SymbolMap = Map.Make (Automaton.Symbol)
 
 let action_lib =
-  "  implicit `loc\n\
-  \  implicit `error {E_err} : Parsing.Error E_err\n\n\
+  "  implicit ~loc\n\
+  \  implicit ~error {E_err} : Parsing.Error E_err\n\n\
   \  pub let _kw_endpos _ =\n\
-  \    match `loc with\n\
+  \    match ~loc with\n\
   \    | l :: _ => snd l\n\
   \    | [] => Parsing.dummyPos\n\
   \    end\n\n\
   \  pub let _kw_startpos (n : Int) =\n\
-  \    match List.nth `loc (n - 1) with\n\
+  \    match List.nth ~loc (n - 1) with\n\
   \    | Some l => fst l\n\
   \    | None => _kw_endpos n\n\
   \    end\n\n\
@@ -19,71 +19,70 @@ let action_lib =
   \  pub let _kw_endofs _ = Parsing.error \"unimplemented: $endofs\"\n\
   \  pub let _kw_symbolstartofs _ = Parsing.error \"unimplemented: $symbolstartofs\"\n\
   \  pub let _kw_loc n = _kw_startpos n, _kw_endpos n\n\
-  \  pub let _kw_sloc _ = Parsing.error \"unimplemented: $sloc\"
-  \n"
+  \  pub let _kw_sloc _ = Parsing.error \"unimplemented: $sloc\"\n\
+  \  \n"
 ;;
 
 let state_lib =
- "  let lexfun {E_err, E_st, R_lex,\n\
- \              `error : Parsing.Error E_err,\n\
- \              `st : State2 E_st,\n\
- \              `lex : Parsing.Lex R_lex Tok} () = \n\
- \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
- \    fn () => `lex.token ()\n\
- \    in aux ()\n\n\
- \  let shift {E_err, E_st, R_lex,\n\
- \             `error : Parsing.Error E_err,\n\
- \             `st : State2 E_st,\n\
- \             `lex : Parsing.Lex R_lex Tok} () = \n\
- \    let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
- \      (fn () => \n\
- \        let sym = Utils.optionGet {`re = (fn () => Parsing.error \"option\")}\n\
- \     			            (getPeeked ()) in\n\
- \        let () = setPeeked None in\n\
- \        let () = setFallback (`lex.curPos ()) in\n\
- \        sym)\n\
- \    in aux ()\n\n\
- \  let lookahead {E_err, E_st, R_lex,\n\
- \                 `error : Parsing.Error E_err,\n\
- \                 `st : State2 E_st,\n\
- \                 `lex : Parsing.Lex R_lex Tok} () = \n\
- \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
- \      (fn () => \n\
- \        match getPeeked () with\n\
- \        | Some (tok, _) => tok\n\
- \        | None =>\n\
- \          let tok = lexfun () in\n\
- \          let loc = `lex.startPos (), `lex.curPos () in\n\
- \          let () = setPeeked (Some (tok, loc)) in\n\
- \          tok\n\
- \        end)\n\
- \    in aux ()\n\n\
- \  implicit `loc\n\
- \  let loc_shift l = l :: `loc\n\n\
- \  let loc_reduce {E_err, E_st, R_lex,\n\
- \                  `error : Parsing.Error E_err,\n\
- \                  `st : State2 E_st,\n\
- \                  `lex : Parsing.Lex R_lex Tok} n =\n\
- \    let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
- \      (fn (n : Int) =>\n\
- \        if n == 0 then (getFallback (), getFallback ()) :: `loc\n\
- \        else\n\
- \          (let rec skip (n : Int) xs =\n\
- \     	      if n == 0 then xs\n\
- \     	      else skip (n - 1)\n\
- \     		        (List.tlErr {`onError = (fn () => Parsing.error \"tl\")}\n\
- \     			            xs) in\n\
- \           let l = (fst (List.nthErr {`onError = (fn () => Parsing.error \"nth\")}\n\
- \     			               `loc\n\
- \     			               (n - 1)),\n\
- \     	              snd (List.hdErr {`onError = (fn () => Parsing.error \"hd\")}\n\
- \     			              `loc)) in\n\
- \           l :: skip n `loc))\n\
- \    in aux n\n\n\
- \  implicit `lex {R_lex} : Parsing.Lex R_lex Tok\n\
- \  implicit `st {E_st} : State2 E_st\n\
- \  implicit `error {E_err} : Parsing.Error E_err\n\
- \n"
+  "  let lexfun {E_err, E_st, R_lex,\n\
+  \              ~error : Parsing.Error E_err,\n\
+  \              ~st : State2 E_st,\n\
+  \              ~lex : Parsing.Lex R_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+  \    fn () => ~lex.token ()\n\
+  \    in aux ()\n\n\
+  \  let shift {E_err, E_st, R_lex,\n\
+  \             ~error : Parsing.Error E_err,\n\
+  \             ~st : State2 E_st,\n\
+  \             ~lex : Parsing.Lex R_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
+  \      (fn () => \n\
+  \        let sym = Utils.optionGet {~re = (fn () => Parsing.error \"option\")}\n\
+  \                  (getPeeked ()) in\n\
+  \        let () = setPeeked None in\n\
+  \        let () = setFallback (~lex.curPos ()) in\n\
+  \        sym)\n\
+  \    in aux ()\n\n\
+  \  let lookahead {E_err, E_st, R_lex,\n\
+  \                 ~error : Parsing.Error E_err,\n\
+  \                 ~st : State2 E_st,\n\
+  \                 ~lex : Parsing.Lex R_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+  \      (fn () => \n\
+  \        match getPeeked () with\n\
+  \        | Some (tok, _) => tok\n\
+  \        | None =>\n\
+  \          let tok = lexfun () in\n\
+  \          let loc = ~lex.startPos (), ~lex.curPos () in\n\
+  \          let () = setPeeked (Some (tok, loc)) in\n\
+  \          tok\n\
+  \        end)\n\
+  \    in aux ()\n\n\
+  \  implicit ~loc\n\
+  \  let loc_shift l = l :: ~loc\n\n\
+  \  let loc_reduce {E_err, E_st, R_lex,\n\
+  \                  ~error : Parsing.Error E_err,\n\
+  \                  ~st : State2 E_st,\n\
+  \                  ~lex : Parsing.Lex R_lex Tok} n =\n\
+  \    let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
+  \      (fn (n : Int) =>\n\
+  \        if n == 0 then (getFallback (), getFallback ()) :: ~loc\n\
+  \        else\n\
+  \          (let rec skip (n : Int) xs =\n\
+  \             if n == 0 then xs\n\
+  \             else skip (n - 1)\n\
+  \                 (List.tlErr {~onError = (fn () => Parsing.error \"tl\")}\n\
+  \                       xs) in\n\
+  \           let l = (fst (List.nthErr {~onError = (fn () => Parsing.error \"nth\")}\n\
+  \                          ~loc\n\
+  \                          (n - 1)),\n\
+  \                     snd (List.hdErr {~onError = (fn () => Parsing.error \"hd\")}\n\
+  \                         ~loc)) in\n\
+  \           l :: skip n ~loc))\n\
+  \    in aux n\n\n\
+  \  implicit ~lex {R_lex} : Parsing.Lex R_lex Tok\n\
+  \  implicit ~st {E_st} : State2 E_st\n\
+  \  implicit ~error {E_err} : Parsing.Error E_err\n\n"
 ;;
 
 let iteri2 f xs ys =
@@ -208,7 +207,7 @@ struct
       f
       "%t%s x = %t"
       (fun f -> write_cont_id f group idx)
-      (if S.locations then " {`loc}" else "") 
+      (if S.locations then " {~loc}" else "")
       (fun f -> write_goto_call f state sym)
   ;;
 
@@ -226,7 +225,7 @@ struct
   ;;
 
   let write_action_shift f state sym =
-    let write_loc_update f = Format.fprintf f " in\n      let `loc = loc_shift _l" in
+    let write_loc_update f = Format.fprintf f " in\n      let ~loc = loc_shift _l" in
     if S.comments then Format.fprintf f "    (* Shift *)\n";
     Format.fprintf
       f
@@ -237,22 +236,21 @@ struct
   ;;
 
   let write_action_reduce f state lookahead i j =
-    let write_loc_update f n =
-      Format.fprintf f "\n      in let `loc = loc_reduce %d" n
-    in
+    let write_loc_update f n = Format.fprintf f "\n      in let ~loc = loc_reduce %d" n in
     if S.comments then Format.fprintf f "    (* Reduce *)\n";
     let group = List.nth (state.s_kernel @ state.s_closure) i in
     let n = List.length group.g_prefix
     and item = List.nth group.g_items j in
-    TermSet.iter (fun sym ->
-		    Format.fprintf
-		      f
-		      "    | %t =>\n      let x =%t%t in\n      %t x\n"
-		      (fun f -> write_term_pattern f false sym)
-		      (fun f -> write_semantic_action_call f group item)
-		      (fun f -> if S.locations then write_loc_update f n)
-		      (fun f -> write_cont_id f group i))
-		 lookahead
+    TermSet.iter
+      (fun sym ->
+        Format.fprintf
+          f
+          "    | %t =>\n      let x =%t%t in\n      %t x\n"
+          (fun f -> write_term_pattern f false sym)
+          (fun f -> write_semantic_action_call f group item)
+          (fun f -> if S.locations then write_loc_update f n)
+          (fun f -> write_cont_id f group i))
+      lookahead
   ;;
 
   let write_action f state lookahead = function
@@ -362,7 +360,7 @@ struct
       f
       "%t%s%t%t =\n"
       (fun f -> write_state_id f id)
-      (if S.locations then " {`loc}" else "")
+      (if S.locations then " {~loc}" else "")
       (fun f -> write_arg_ids f (List.hd state.s_kernel).g_prefix)
       (fun f -> write_cont_ids f (fun _ -> true) state.s_kernel)
   ;;
@@ -388,21 +386,20 @@ struct
   let write_entry f symbol id =
     Format.fprintf
       f
-      "pub let %s {`lex} () =\n\
-      \  handle `error = Parsing.Error (effect x / _ => Left x)\n\
+      "pub let %s {~lex} () =\n\
+      \  handle ~error = Parsing.Error (effect x / _ => Left x)\n\
       \    return x => Right x in\n\
-      \  handle `st = State2\n\
+      \  handle ~st = State2\n\
       \    { setPeeked = effect p / r => fn _ f => r () p f\n\
       \    , getPeeked = effect () / r => fn p f => r p p f\n\
       \    , setFallback = effect f / r => fn p _ => r () p f\n\
       \    , getFallback = effect () / r => fn p f => r f p f }\n\
       \    return x => fn _ _ => x\n\
       \    finally f => f None Parsing.dummyPos in\n\
-      \  States.%t%s (fn x => x)\n\
-      \n"
+      \  States.%t%s (fn x => x)\n\n"
       (nterm_name symbol)
       (fun f -> write_state_id f id)
-      (if S.locations then " {`loc = []}" else "")
+      (if S.locations then " {~loc = []}" else "")
   ;;
 
   let write f =
@@ -421,32 +418,34 @@ struct
       "import Parsing\n\
        import Utils\n\
        import List\n\
-       implicit `error {E_err} : Parsing.Error E_err\n\
+       implicit ~error {E_err} : Parsing.Error E_err\n\
        %t\n\n\
        %tdata State2 (effect E) = State2 of\n\
-       \  { setPeeked : Option (Pair Tok (Pair Parsing.Pos Parsing.Pos)) ->[E] Unit\n\
-       \  , setFallback : Parsing.Pos ->[E] Unit\n\
-       \  , getPeeked : Unit ->[E] Option (Pair Tok (Pair Parsing.Pos Parsing.Pos))\n\
-       \  , getFallback : Unit ->[E] Parsing.Pos }\n\n\
+      \  { setPeeked : Option (Pair Tok (Pair Parsing.Pos Parsing.Pos)) ->[E] Unit\n\
+      \  , setFallback : Parsing.Pos ->[E] Unit\n\
+      \  , getPeeked : Unit ->[E] Option (Pair Tok (Pair Parsing.Pos Parsing.Pos))\n\
+      \  , getFallback : Unit ->[E] Parsing.Pos }\n\n\
        method setPeeked {E, self = State2 {setPeeked} : State2 E} = setPeeked\n\
        method getPeeked {E, self = State2 {getPeeked} : State2 E} = getPeeked\n\
        method setFallback {E, self = State2 {setFallback} : State2 E} = setFallback\n\
        method getFallback {E, self = State2 {getFallback} : State2 E} = getFallback\n\n\
-       let setPeeked {E, `st : State2 E} p = `st.setPeeked p\n\
-       let getPeeked {E, `st : State2 E} () = `st.getPeeked ()\n\
-       let setFallback {E, `st : State2 E} f = `st.setFallback f\n\
-       let getFallback {E, `st : State2 E} () = `st.getFallback ()\n\n\
+       let setPeeked {E, ~st : State2 E} p = ~st.setPeeked p\n\
+       let getPeeked {E, ~st : State2 E} () = ~st.getPeeked ()\n\
+       let setFallback {E, ~st : State2 E} f = ~st.setFallback f\n\
+       let getFallback {E, ~st : State2 E} () = ~st.getFallback ()\n\n\
        module Actions\n\
        %s%tend\n\n\
        module States\n\
        %s%tend\n\n\
-       %t" 
+       %t"
       (fun f -> write_string f A.automaton.a_header)
       (fun f -> write_term_type f G.symbols)
       action_lib
-      (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions) (* FIXME: rec blocks are not indented *)
+      (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions)
+        (* FIXME: rec blocks are not indented *)
       state_lib
-      (fun f -> IntMap.bindings A.automaton.a_states |> state_letrec (write_state f)) (* FIXME: rec blocks are not indented *)
+      (fun f -> IntMap.bindings A.automaton.a_states |> state_letrec (write_state f))
+        (* FIXME: rec blocks are not indented *)
       (fun f -> List.iter (write_entry f) A.automaton.a_starting)
   ;;
 end

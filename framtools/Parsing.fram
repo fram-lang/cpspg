@@ -14,9 +14,9 @@ pub data Lex R Tok = Lex of
     , startPos : Unit ->[|R] Pos
     , curPos : Unit -> [|R] Pos }
 
-pub method token {R, Tok, self = Lex {token} : Lex R Tok} = token 
-pub method startPos {R, Tok, self = Lex {startPos} : Lex R Tok} = startPos 
-pub method curPos {R, Tok, self = Lex {curPos} : Lex R Tok} = curPos 
+pub method token {R, Tok, self = Lex {token} : Lex R Tok} = token
+pub method startPos {R, Tok, self = Lex {startPos} : Lex R Tok} = startPos
+pub method curPos {R, Tok, self = Lex {curPos} : Lex R Tok} = curPos
 
 pub data Error (effect E) = Error of ({type X} -> String ->[E] X)
 pub method parseError {E, self = Error f : Error E} = f
@@ -25,5 +25,4 @@ pub method parseError {E, self = Error f : Error E} = f
     in semantic actions. If an error is reported, the result
     returned by the parser will be the passed string wrapped in
     a `Left` constructor. *)
-pub let error {E, `error : Error E} s = `error.parseError s
-
+pub let error {E, ~error : Error E} s = ~error.parseError s
