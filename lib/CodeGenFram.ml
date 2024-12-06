@@ -128,20 +128,7 @@ struct
     loop 0 xs
   ;;
 
-  let write_line_directive f (loc, _) =
-    Format.fprintf
-      f
-      "\n# %d \"%s\"\n%s"
-      loc.Lexing.pos_lnum
-      loc.Lexing.pos_fname
-      (String.make (loc.pos_cnum - loc.pos_bol) ' ')
-  ;;
-
-  let write_string f { loc; data } =
-    if S.line_directives
-    then Format.fprintf f "%t%s" (fun f -> write_line_directive f loc) data
-    else Format.fprintf f "%s" (String.trim data)
-  ;;
+  let write_string f { data; _ } = Format.fprintf f "%s" (String.trim data)
 
   let write_arg_id f symbol idx =
     if S.readable_ids
