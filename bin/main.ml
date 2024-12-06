@@ -1,7 +1,7 @@
-let usage = "usage: cpspg [options] sourcefile"
+let usage = "usage: cpspg [options] <filename>"
 let source_name = ref None
 let output_name = ref None
-let output_automaton = ref None
+let output_format = ref ".ml"
 let grammar_kind = ref Cpspg.Types.LALR
 let codegen_line_directives = ref false (* Disabled for now *)
 let codegen_comments = ref false
@@ -16,38 +16,41 @@ let codegen_readable () =
 
 let specs =
   [ ( "-o"
-    , Arg.String (fun x -> output_name := Some x)
-    , "<file> Set output file name to <file>" )
-  ; ( "--automaton"
-    , Arg.String (fun x -> output_automaton := Some x)
-    , "<file> Dump automaton graph in .dot format to <file>" )
+    , Arg.String
+        (fun x ->
+          output_name := Some x;
+          output_format := Filename.extension x)
+    , "<file>\tSet output file name to <file>" )
+  ; ( "-f"
+    , Arg.String (fun x -> output_format := "." ^ x)
+    , "<format>\tSet output format to <format> (default: detect)" )
     (* Grammar kind *)
   ; ( "--lr0"
     , Arg.Unit (fun _ -> grammar_kind := Cpspg.Types.LR0)
-    , "Construct a LR(0) automaton" )
+    , "\tConstruct a LR(0) automaton" )
   ; ( "--slr"
     , Arg.Unit (fun _ -> grammar_kind := Cpspg.Types.SLR)
-    , "Construct a SLR(1) automaton" )
+    , "\tConstruct a SLR(1) automaton" )
   ; ( "--lr1"
     , Arg.Unit (fun _ -> grammar_kind := Cpspg.Types.LR1)
-    , "Construct a LR(1) automaton" )
+    , "\tConstruct a LR(1) automaton" )
   ; ( "--lalr"
     , Arg.Unit (fun _ -> grammar_kind := Cpspg.Types.LALR)
-    , "Construct a LALR(1) automaton (default)" )
+    , "\tConstruct a LALR(1) automaton (default)" )
     (* Codegen options *)
   ; ( "--no-locations"
     , Arg.Unit (fun _ -> codegen_locations := false)
-    , "Disable family of $loc keywords and related code" )
+    , "\tDisable family of $loc keywords and related code" )
   ; ( "--no-line-directives"
     , Arg.Unit (fun _ -> codegen_line_directives := false)
-    , "Do not include line directives in generated code" )
-  ; "--comment", Arg.Set codegen_comments, "Include comments in the generated code"
+    , "\tDo not include line directives in generated code" )
+  ; "--comment", Arg.Set codegen_comments, "\tInclude comments in the generated code"
   ; ( "--readable-ids"
     , Arg.Set codegen_readable_ids
-    , "Make identifiers in generated code longer" )
+    , "\tMake identifiers in generated code longer" )
   ; ( "--readable"
     , Arg.Unit codegen_readable
-    , "Make generated code more readable (implies --comment, --readable-ids and \
+    , "\tMake generated code more readable (implies --comment, --readable-ids and \
        --no-line-directives)" )
   ]
   |> Arg.align
@@ -96,15 +99,16 @@ let main () =
   let module Conflicts = Warning.Conflict (Grammar) (Automaton) in
   List.iter (fun (i, s, a) -> Conflicts.report i s a) !conflicts;
   (* Fourth pass: initialize code generation *)
-  let module Code = Cpspg.CodeGen.Make (Settings) (Grammar) (Automaton) in
-  let module Graphviz = Cpspg.Graphviz.Make (Grammar) in
-  (* Final work *)
-  Code.write (Format.formatter_of_out_channel output);
-  match !output_automaton with
-  | None -> ()
-  | Some x ->
-    let out = if x = "-" then stdout else open_out x in
-    Graphviz.fmt_automaton (Format.formatter_of_out_channel out) Automaton.automaton
+  let module Code =
+    (val match !output_format with
+         | ".ml" -> (module Cpspg.CodeGenMl.Make (Settings) (Grammar) (Automaton))
+         | ".fram" -> (module Cpspg.CodeGenFram.Make (Settings) (Grammar) (Automaton))
+         | ".dot" -> (module Cpspg.CodeGenDot.Make (Settings) (Grammar) (Automaton))
+         | _ -> failwith "Unknown output format"
+      : Cpspg.Types.Code)
+  in
+  (* Write results *)
+  Code.write (Format.formatter_of_out_channel output)
 ;;
 
 let _ =

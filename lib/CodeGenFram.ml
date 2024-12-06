@@ -96,7 +96,7 @@ let iteri2 f xs ys =
 module Make (S : Types.Settings) (G : Types.Grammar) (A : Types.Automaton) : Types.Code =
 struct
   open Automaton
-  module D = Graphviz.Make (G)
+  module D = CodeGenDot.Make (S) (G) (A)
 
   let term_name t = (G.term t).ti_name.data
   let nterm_name n = (G.nterm n).ni_name.data
@@ -438,7 +438,7 @@ struct
        module States\n\
        %s%tend\n\n\
        %t"
-      (fun f -> write_string f A.automaton.a_header)
+      (fun f -> List.iter (write_string f) A.automaton.a_header)
       (fun f -> write_term_type f G.symbols)
       action_lib
       (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions)
