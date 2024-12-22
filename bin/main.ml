@@ -1,7 +1,12 @@
-let usage = "usage: cpspg [options] <filename>"
+let usage =
+  "usage:\n\
+  \  cpspg [options] <input> <output> ...\n\
+  \  cpspg [options] -o <output> <input>\n"
+;;
+
 let source_name = ref None
-let output_name = ref None
-let output_format = ref ".ml"
+let output_names = ref []
+let output_format = ref None
 let grammar_kind = ref Cpspg.Types.LALR
 let codegen_line_directives = ref true
 let codegen_comments = ref false
@@ -15,15 +20,18 @@ let codegen_readable () =
   codegen_comments := true
 ;;
 
+let positional_arg x =
+  match !source_name with
+  | Some _ -> output_names := x :: !output_names
+  | None -> source_name := Some x
+;;
+
 let specs =
   [ ( "-o"
-    , Arg.String
-        (fun x ->
-          output_name := Some x;
-          output_format := Filename.extension x)
+    , Arg.String (fun x -> output_names := x :: !output_names)
     , "<file>\tSet output file name to <file>" )
   ; ( "-f"
-    , Arg.String (fun x -> output_format := "." ^ x)
+    , Arg.String (fun x -> output_format := Some ("." ^ x))
     , "<format>\tSet output format to <format> (default: detect)" )
     (* Grammar kind *)
   ; ( "--lr0"
@@ -60,17 +68,13 @@ let specs =
   |> Arg.align
 ;;
 
-let _ = Arg.parse specs (fun x -> source_name := Some x) usage
+let _ = Arg.parse specs positional_arg usage
 
 let main () =
   let input, input_name =
     match !source_name with
     | None | Some "-" -> stdin, "-"
     | Some x -> open_in x, x
-  and output =
-    match !output_name with
-    | None | Some "-" -> stdout
-    | Some x -> open_out x
   in
   (* Settings *)
   let module Settings = struct
@@ -87,12 +91,16 @@ let main () =
     let conflicts = ref []
     let has_error = ref false
 
-    let report_err ~loc =
+    let report_err ?loc =
       has_error := true;
-      Format.kdprintf (Warning.report_err ~loc:(fst loc))
+      let loc = Option.map fst loc in
+      Format.kdprintf (Warning.report_err ?loc)
     ;;
 
-    let report_warn ~loc = Format.kdprintf (Warning.report_warn ~loc:(fst loc))
+    let report_warn ?loc =
+      let loc = Option.map fst loc in
+      Format.kdprintf (Warning.report_warn ?loc)
+    ;;
 
     let report_conflict id sym actions =
       has_error := true;
@@ -132,15 +140,25 @@ let main () =
   let module Conflicts = Warning.Conflict (Grammar) (Automaton) in
   List.iter (fun (i, s, a) -> Conflicts.report i s a) !Settings.conflicts;
   (* Fourth pass: initialize code generation *)
-  let module Code =
-    (val match !output_format with
-         | ".ml" -> (module Cpspg.CodeGenMl.Make (Settings) (Grammar) (Automaton))
-         | ".dot" -> (module Cpspg.CodeGenDot.Make (Settings) (Grammar) (Automaton))
-         | _ -> failwith "Unknown output format"
-      : Cpspg.Types.Code)
+  let write format output =
+    let module Code =
+      (val match format with
+           | ".ml" -> (module Cpspg.CodeGenMl.Make (Settings) (Grammar) (Automaton))
+           | ".mli" -> (module Cpspg.CodeGenMli.Make (Settings) (Grammar) (Automaton))
+           | ".dot" -> (module Cpspg.CodeGenDot.Make (Settings) (Grammar) (Automaton))
+           | _ -> failwith "Unknown output format"
+        : Cpspg.Types.Code)
+    in
+    if not !Settings.has_error then Code.write (Format.formatter_of_out_channel output)
+  in
+  let get_format file = function
+    | Some f -> f
+    | None -> Filename.extension file
   in
   (* Write results *)
-  if not !Settings.has_error then Code.write (Format.formatter_of_out_channel output);
+  (match !output_names with
+   | [] -> write ".ml" stdout
+   | xs -> List.iter (fun x -> write (get_format x !output_format) (open_out x)) xs);
   Bool.to_int !Settings.has_error
 ;;
 

@@ -34,7 +34,7 @@ type token =
   | DCODE of (string)
   | COMMA
   | COLON
-  | CODE of (code)
+  | CODE of (Ast.code)
   | BAR
 
 module Actions = struct

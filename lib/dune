@@ -8,9 +8,7 @@
  (deps Parser.mly)
  (target Parser.cpspg.ml)
  (action
-  (chdir
-   %{workspace_root}
-   (run cpspg --readable -o %{target} %{deps}))))
+  (run cpspg --readable -o %{target} %{deps})))
 
 (rule
  (deps Standard.mly)

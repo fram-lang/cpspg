@@ -98,6 +98,28 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
     prec
   ;;
 
+  let types =
+    let types = Hashtbl.create 64 in
+    let add_type typ id =
+      match Hashtbl.find_opt types id.data with
+      | Some ty when ty <> typ ->
+        S.report_err ~loc:id.loc "conflicting types for symbol %s" id.data
+      | Some _ -> S.report_warn ~loc:id.loc "multiple types for symbol %s" id.data
+      | _ -> Hashtbl.add types id.data typ
+    in
+    let add_sym_type typ = function
+      | Ast.Term t -> add_type typ t
+      | Ast.NTerm n -> add_type typ n
+    in
+    let iter = function
+      | Ast.DeclType (ty, ids) -> List.iter (add_sym_type ty) ids
+      | Ast.DeclStart (Some ty, ids) -> List.iter (add_type ty) ids
+      | _ -> ()
+    in
+    List.iter iter A.ast.decls;
+    types
+  ;;
+
   (** [term] is a mapping from a terminal name to its id and info. *)
   let term =
     let term = Hashtbl.create 128 in
@@ -251,7 +273,11 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
       InstanceMap.add nterm_id (rule, args) id;
       let env = init_env rule.Ast.id.loc rule.Ast.params args in
       let items = List.map (tr_production env) rule.prods |> List.flatten in
-      let info = { ni_name = rule.id; ni_starting = false }
+      let info =
+        { ni_name = rule.id
+        ; ni_starting = false
+        ; ni_type = Hashtbl.find_opt types rule.id.data
+        }
       and group =
         { g_symbol = id
         ; g_prefix = []

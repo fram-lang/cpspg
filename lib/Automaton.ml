@@ -111,6 +111,7 @@ type term_info =
 
 type nterm_info =
   { ni_name : string node
+  ; ni_type : string node option
   ; ni_starting : bool
   }
 

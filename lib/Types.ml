@@ -17,8 +17,8 @@ module type Settings = sig
   val readable_ids : bool
 
   (* Warning and error reporting *)
-  val report_err : loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
-  val report_warn : loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
+  val report_err : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
+  val report_warn : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
   val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
 end
 

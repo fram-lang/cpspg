@@ -10,10 +10,10 @@ let plus, star, qmark =
 
 %}
 
-%start<Grammar.t> grammar
+%start<Ast.t> grammar
 
 %token<string> ID TID TYPE
-%token<code> CODE
+%token<Ast.code> CODE
 %token<string> DCODE
 %token DTOKEN DTYPE DSTART DLEFT DRIGHT DNONASSOC DSEP
 %token DINLINE DPREC

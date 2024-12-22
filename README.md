@@ -40,9 +40,9 @@ To integrate this tool into a dune build process, add the following rule to your
 ```dune
 (rule
  (deps Parser.mly)
- (target Parser.ml)
+ (target Parser.ml Parser.mli)
  (action
-  (chdir %{workspace_root} (run cpspg -o %{target} %{deps}))))
+  (chdir %{workspace_root} (run cpspg %{deps} %{target}))))
 ```
 
 ## Building
