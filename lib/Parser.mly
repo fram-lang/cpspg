@@ -40,7 +40,7 @@ rule:
   | inline=boption(DINLINE)
     id=id params=loption(parameters) COLON
     option(BAR) prods=separated_nonempty_list(BAR, production)
-    SEMI
+    SEMI*
       { { id; inline; params; prods } }
 ;
 
@@ -56,12 +56,15 @@ parameter:
 production:
   | prod=producer*
     prec=preceded(DPREC, symbol)?
-    action=code { { prod; prec; action } }
+    action=code
+      { { prod; prec; action } }
 ;
 
 producer:
   | id=ioption(terminated(id, EQ))
-    actual=actual { { id; actual } }
+    actual=actual
+    SEMI*
+      { { id; actual } }
 ;
 
 actual:
