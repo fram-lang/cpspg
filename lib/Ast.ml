@@ -48,10 +48,15 @@ and producer =
   ; actual : actual
   }
 
+type action =
+  { cond : (symbol * symbol) option
+  ; code : code node
+  }
+
 type production =
   { prod : producer list
   ; prec : symbol option
-  ; action : code node
+  ; actions : action list
   }
 
 type rule =

@@ -21,6 +21,8 @@ continuation-passing style, which allows for better type inference and more effi
   - Shorthand notations `*`, `+`, and `?`
   - `%inline` rules
   - Anonymous rules
+- Experimental/non-standard:
+  - `%when` conditions
 
 Planned but not yet supported:
 

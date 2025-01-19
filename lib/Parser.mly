@@ -15,7 +15,7 @@ let plus, star, qmark =
 %token<string> ID TID TYPE
 %token<Ast.code> CODE
 %token<string> DCODE
-%token DTOKEN DTYPE DSTART DLEFT DRIGHT DNONASSOC DSEP
+%token DTOKEN DTYPE DSTART DLEFT DRIGHT DNONASSOC DSEP DWHEN
 %token DINLINE DPREC
 %token BAR COLON COMMA EQ PLUS QMARK SEMI STAR LPAREN RPAREN
 %token EOF
@@ -56,8 +56,17 @@ parameter:
 production:
   | prod=producer*
     prec=preceded(DPREC, symbol)?
-    action=code
-      { { prod; prec; action } }
+    actions=actions
+      { { prod; prec; actions } }
+;
+
+actions:
+  | xs=conditional_action+           { xs }
+  | xs=conditional_action* code=code { xs @ [{ cond = None; code }] }
+;
+
+conditional_action:
+  | DWHEN lhs=symbol EQ rhs=symbol code=code { { cond = Some ((lhs, rhs)); code } }
 ;
 
 producer:
@@ -82,7 +91,6 @@ args:
   | LPAREN args=separated_nonempty_list(COMMA, arg) RPAREN { args }
 ;
 
-%inline
 arg:
   | x=actual                   { Arg x }
   | prod=producer* action=code { ArgInline { prod; action } }

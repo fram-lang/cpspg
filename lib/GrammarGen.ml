@@ -180,7 +180,7 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
       Terminal.dummy
   ;;
 
-  let tr_action (prod : Ast.producer list) (code : Ast.code node) =
+  let tr_action prod code =
     let get_args = function
       | { Ast.id = None; Ast.actual = _; _ } -> None
       | { Ast.id = Some id; _ } -> Some id.data
@@ -195,7 +195,27 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
       id
   ;;
 
-  let tr_values values =
+  let rec tr_actions env prod actions =
+    let get symbol =
+      match tr_actual env { Ast.symbol; args = [] } with
+      | VInline _ ->
+        S.report_err
+          ~loc:(sym_name symbol).loc
+          "inline symbols are not allowed in conditions";
+        None
+      | VDummy -> None
+      | value -> Some value
+    in
+    let f = function
+      | { cond = None; Ast.code } -> Some (tr_action prod code)
+      | { cond = Some (lhs, rhs); Ast.code } ->
+        (match get lhs, get rhs with
+         | Some l, Some r when l = r -> Some (tr_action prod code)
+         | _ -> None)
+    in
+    List.find_map f actions
+
+  and tr_values values =
     let append_one x xxs = List.map (fun xs -> x :: xs) xxs
     and append_some yys xxs =
       List.map (fun ys -> List.map (List.rev_append ys) xxs) yys |> List.flatten
@@ -215,9 +235,8 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
     in
     let sym, arg = List.fold_left f ([ [] ], [ [] ]) values in
     List.map List.rev sym, List.map List.rev arg
-  ;;
 
-  let rec tr_actual env actual : value =
+  and tr_actual env actual : value =
     let sym = actual.Ast.symbol in
     let name = sym_name sym in
     let get_nterm id args =
@@ -245,19 +264,22 @@ module Run (S : Types.Settings) (A : Types.Ast) : Types.Grammar = struct
     let values = List.map (fun p -> tr_actual env p.Ast.actual) prod.Ast.prod in
     let get_prec p = Hashtbl.find_opt prec (sym_name p).data in
     let get_group suffix args =
-      { i_suffix = suffix
-      ; i_action = Some { ac_id = tr_action prod.prod prod.action; ac_args = args }
-      ; i_prec = Option.bind prod.Ast.prec get_prec
-      }
+      match tr_actions env prod.prod prod.actions with
+      | Some action ->
+        let action = Some { ac_id = action; ac_args = args }
+        and prec = Option.bind prod.Ast.prec get_prec in
+        Some { i_suffix = suffix; i_action = action; i_prec = prec }
+      | None -> None
     in
     let sym, arg = tr_values values in
-    List.map2 get_group sym arg
+    List.map2 get_group sym arg |> List.filter_map Fun.id
 
   and tr_args env args =
     let tr_arg = function
       | Ast.Arg actual -> tr_actual env actual
       | Ast.ArgInline { prod; action } ->
-        VInline (tr_production env { prod; action; prec = None })
+        let actions = [ { Ast.cond = None; code = action } ] in
+        VInline (tr_production env { prod; actions; prec = None })
     in
     List.map tr_arg args
 

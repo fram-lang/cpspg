@@ -76,6 +76,7 @@ rule main = parse
 
   | "%inline"   { DINLINE }
   | "%prec"     { DPREC }
+  | "%when"     { DWHEN }
 
   | "%\\" { DSEP }
   | "%<"  { DLEFT }
