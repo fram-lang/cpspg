@@ -109,11 +109,11 @@ let main () =
   end
   in
   (* First pass: parse grammar definition *)
-  let module Ast = struct
+  let module Raw = struct
     let lexbuf = Lexing.from_channel input
     let _ = Lexing.set_filename lexbuf input_name
 
-    let ast =
+    let raw =
       try Cpspg.Parser.grammar Cpspg.Lexer.main lexbuf with
       | Parsing.Parse_error ->
         let loc = lexbuf.lex_start_p, lexbuf.lex_curr_p
@@ -121,20 +121,20 @@ let main () =
         and exp = Cpspg.Parser.expected_tokens () in
         let exp = String.concat ", " exp in
         Settings.report_err ~loc "Unexpected token `%s', expected %s" lex exp;
-        Cpspg.Ast.dummy
+        Cpspg.Raw.dummy
       | Cpspg.Lexer.UnexpectedInput (Some c) ->
         let loc = lexbuf.lex_start_p, lexbuf.lex_curr_p in
         Settings.report_err ~loc "Unexpected character `%c'" c;
-        Cpspg.Ast.dummy
+        Cpspg.Raw.dummy
       | Cpspg.Lexer.UnexpectedInput None ->
         let loc = lexbuf.lex_start_p, lexbuf.lex_curr_p in
         Settings.report_err ~loc "Unexpected end of input";
-        Cpspg.Ast.dummy
+        Cpspg.Raw.dummy
     ;;
   end
   in
   (* Second pass: create context-free grammar *)
-  let module Grammar = Cpspg.GrammarGen.Run (Settings) (Ast) in
+  let module Grammar = Cpspg.GrammarGen.Run (Settings) (Raw) in
   (* Third pass: create LR automaton *)
   let module Automaton = Cpspg.AutomatonGen.Run (Settings) (Grammar) in
   let module Conflicts = Warning.Conflict (Grammar) (Automaton) in

@@ -406,19 +406,19 @@ struct
       and ofs = l.pos_cnum - (fst action.sa_code.loc).pos_cnum in
       write_string f { data = String.sub (fst code.data) ofs len; loc = l, r }
     and get_impl = function
-      | Ast.KwArg i ->
+      | Raw.KwArg i ->
         (match List.nth_opt action.sa_args (i - 1) with
          | Some (Some a) -> a
          | Some None -> Printf.sprintf "_arg%d" i
          | None -> "()")
-      | Ast.KwStartpos -> Printf.sprintf "_kw_startpos ~loc:_loc %d" n
-      | Ast.KwEndpos -> Printf.sprintf "_kw_endpos ~loc:_loc %d" n
-      | Ast.KwSymbolstartpos -> Printf.sprintf "_kw_symbolstartpos ~loc:_loc %d" n
-      | Ast.KwStartofs -> Printf.sprintf "_kw_startofs ~loc:_loc %d" n
-      | Ast.KwEndofs -> Printf.sprintf "_kw_endofs ~loc:_loc %d" n
-      | Ast.KwSymbolstartofs -> Printf.sprintf "_kw_symbolstartofs ~loc:_loc %d" n
-      | Ast.KwLoc -> Printf.sprintf "_kw_loc ~loc:_loc %d" n
-      | Ast.KwSloc -> Printf.sprintf "_kw_sloc ~loc:_loc %d" n
+      | Raw.KwStartpos -> Printf.sprintf "_kw_startpos ~loc:_loc %d" n
+      | Raw.KwEndpos -> Printf.sprintf "_kw_endpos ~loc:_loc %d" n
+      | Raw.KwSymbolstartpos -> Printf.sprintf "_kw_symbolstartpos ~loc:_loc %d" n
+      | Raw.KwStartofs -> Printf.sprintf "_kw_startofs ~loc:_loc %d" n
+      | Raw.KwEndofs -> Printf.sprintf "_kw_endofs ~loc:_loc %d" n
+      | Raw.KwSymbolstartofs -> Printf.sprintf "_kw_symbolstartofs ~loc:_loc %d" n
+      | Raw.KwLoc -> Printf.sprintf "_kw_loc ~loc:_loc %d" n
+      | Raw.KwSloc -> Printf.sprintf "_kw_sloc ~loc:_loc %d" n
     in
     let rec loop pos = function
       | [] -> write_part f pos (snd code.loc)

@@ -40,9 +40,9 @@ module SymbolMap = Map.Make (Symbol)
 module TermSet = Set.Make (Terminal)
 module IntMap = Map.Make (Int)
 
-type loc = Ast.loc
+type loc = Raw.loc
 
-type 'a node = 'a Ast.node =
+type 'a node = 'a Raw.node =
   { loc : loc
   ; data : 'a
   }
@@ -83,7 +83,7 @@ type group =
 
 type semantic_action =
   { sa_args : string option list
-  ; sa_code : Ast.code node
+  ; sa_code : Raw.code node
   }
 
 type action =

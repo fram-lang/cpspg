@@ -22,8 +22,8 @@ module type Settings = sig
   val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
 end
 
-module type Ast = sig
-  val ast : Ast.t
+module type Raw = sig
+  val raw : Raw.t
 end
 
 module type Grammar = sig
