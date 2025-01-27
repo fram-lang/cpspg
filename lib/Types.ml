@@ -6,20 +6,30 @@ type kind =
 
 module IntMap = Map.Make (Int)
 
-module type Settings = sig
-  val kind : kind
+module type Logger = sig
+  (* Warning and error reporting *)
+  val report_err : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
+  val report_warn : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
+  val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
+end
 
-  (* Codegen *)
+module type FrontSettings = sig
+  include Logger
+
+  val kind : kind
+end
+
+module type BackSettings = sig
+  include Logger
+
   val locations : bool
   val compat : bool
   val line_directives : bool
   val comments : bool
   val readable_ids : bool
 
-  (* Warning and error reporting *)
-  val report_err : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
-  val report_warn : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
-  val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
+  (* Output *)
+  val out : out_channel
 end
 
 module type Raw = sig
@@ -40,5 +50,5 @@ module type Automaton = sig
 end
 
 module type Code = sig
-  val write : Format.formatter -> unit
+  val write : unit -> unit
 end

@@ -7,7 +7,7 @@ module type DotCode = sig
   val fmt_state_actions : Format.formatter -> Automaton.state -> unit
 end
 
-module Make (S : Types.Settings) (G : Types.Grammar) (A : Types.Automaton) : DotCode =
+module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) : DotCode =
 struct
   open Automaton
 
@@ -80,4 +80,5 @@ struct
   ;;
 
   let write f = fmt_automaton f A.automaton
+  let write () = write (Format.formatter_of_out_channel S.out)
 end

@@ -5,8 +5,8 @@ let epilogue =
 ;;
 
 (* TODO: Maybe share some code with CodeGenMl.ml? *)
-module Make (S : Types.Settings) (G : Types.Grammar) (A : Types.Automaton) : Types.Code =
-struct
+module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
+  Types.Code = struct
   open Automaton
   module D = CodeGenDot.Make (S) (G) (A)
 
@@ -71,4 +71,6 @@ struct
       (fun f -> List.iter (write_entry f) A.automaton.a_starting)
       epilogue
   ;;
+
+  let write () = write (Format.formatter_of_out_channel S.out)
 end
