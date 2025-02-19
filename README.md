@@ -29,6 +29,25 @@ Planned but not yet supported:
 - Error recovery
 - Parametric semantic actions
 
+## Installation
+
+To install `cpspg` using `opam`, you can pin the package directly from the GitHub repository:
+
+```sh
+opam pin add cpspg git+https://github.com/fram-lang/cpspg.git
+```
+
+This will fetch the latest version of `cpspg` from the repository and install it.
+
+Alternatively, you can build `cpspg` manually from the source code:
+
+```sh
+git clone git+https://github.com/fram-lang/cpspg.git
+cd cpspg
+dune build --profile=release
+dune install
+```
+
 ## Usage
 
 To generate a parser from a `.mly` grammar definition, use the following command:
