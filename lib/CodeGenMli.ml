@@ -21,9 +21,9 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
       (String.make (loc.pos_cnum - loc.pos_bol) ' ')
   ;;
 
-  let write_string f { loc; data } =
+  let write_string f { span; data } =
     if S.line_directives
-    then Format.fprintf f "%t%s" (fun f -> write_line_directive f loc) data
+    then Format.fprintf f "%t%s" (fun f -> write_line_directive f span) data
     else Format.fprintf f "%s" (String.trim data)
   ;;
 

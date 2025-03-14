@@ -6,26 +6,27 @@ open Lexing
 
 exception UnexpectedInput of (char option)
 
-let add_c = Buffer.add_char
-let add_s = Buffer.add_string
+let buf = Buffer.create 256
+let add_char = Buffer.add_char buf
+let add_string = Buffer.add_string buf
 
-let update_loc lexbuf file line =
-  let pos = lexbuf.lex_curr_p in
-  let file = Option.value ~default:pos.pos_fname file in
-  lexbuf.lex_curr_p
-    <- { pos with pos_fname = file; pos_lnum = line; pos_bol = pos.pos_cnum }
+let add_newline lexbuf =
+  Lexing.new_line lexbuf;
+  add_char '\n'
 ;;
 
-let sync buf lexbuf = Lexing.lexeme lexbuf |> Buffer.add_string buf
+(** [add_lexeme lexbuf] is identical to [add_string (Lexing.lexeme lexbuf)] *)
+let add_lexeme lexbuf =
+  let l = lexbuf.lex_curr_pos - lexbuf.lex_start_pos in
+  Buffer.add_subbytes buf lexbuf.lex_buffer lexbuf.lex_start_pos l
+;;
 
-let wrapped pre post f lexbuf =
-  let buf = Buffer.create 64
-  and pos = lexbuf.lex_start_p in
-  Buffer.add_string buf pre;
-  let res = f (sync buf) lexbuf in
-  Buffer.add_string buf post;
-  lexbuf.lex_start_p <- pos;
-  Buffer.contents buf, res
+let wrap_string_lexer f lexbuf =
+  let s = lexbuf.lex_start_p in
+  Buffer.clear buf;
+  f lexbuf;
+  lexbuf.lex_start_p <- s;
+  Buffer.contents buf
 ;;
 
 let keyword_of_string = function
@@ -53,17 +54,18 @@ rule main = parse
   | newline { new_line lexbuf; main lexbuf }
   | blank   { main lexbuf }
 
-  | "#" blank* (['0'-'9']+ as num) blank*
-      ('"' ([^ '\r' '\n' '"']* as name) '"')?
-      [^ '\r' '\n']* newline
-    { update_loc lexbuf name (int_of_string num); main lexbuf }
+  | '#' blank* (['0'-'9']+ as num) blank* ('"' ([^ '\r' '\n' '"']* as name) '"')? [^ '\r' '\n']* newline
+    { let pos = lexbuf.lex_curr_p in
+      let name = Option.value ~default:pos.pos_fname name in
+      lexbuf.lex_curr_p <- { pos with pos_fname = name; pos_lnum = (int_of_string num); pos_bol = pos.pos_cnum };
+      main lexbuf }
 
-  | "(*" { wrapped "" "" (comment 0) lexbuf |> ignore; main lexbuf }
+  | "(*" { comment 0 lexbuf; main lexbuf }
 
-  | "/*" { ccomment lexbuf; main lexbuf }
-  | "//" { ccomment_line lexbuf; main lexbuf }
+  | "/*" { c_comment lexbuf; main lexbuf }
+  | "//" { c_line_comment lexbuf; main lexbuf }
 
-  | "%token"    { DTOKEN}
+  | "%token"    { DTOKEN }
   | "%term"     { DTOKEN }
   | "%type"     { DTYPE }
   | "%start"    { DSTART }
@@ -72,7 +74,7 @@ rule main = parse
   | "%nonassoc" { DNONASSOC }
   | "%binary"   { DNONASSOC }
   | "%%"        { DSEP }
-  | "%{"        { DCODE (wrapped "  " "  " (dcode 0) lexbuf |> fst) }
+  | "%{"        { DCODE (wrap_string_lexer (dcode 0) lexbuf) }
 
   | "%inline"   { DINLINE }
   | "%prec"     { DPREC }
@@ -84,41 +86,47 @@ rule main = parse
   | "%0"  { DTOKEN }
   | "%2"  { DNONASSOC }
 
-  | "|" { BAR }
-  | ":" { COLON }
-  | "," { COMMA }
-  | "=" { EQ }
-  | "+" { PLUS }
-  | "?" { QMARK }
-  | ";" { SEMI }
-  | "*" { STAR }
-  | "(" { LPAREN }
-  | ")" { RPAREN }
+  | '|' { BAR }
+  | ':' { COLON }
+  | ',' { COMMA }
+  | '=' { EQ }
+  | '+' { PLUS }
+  | '?' { QMARK }
+  | ';' { SEMI }
+  | '*' { STAR }
+  | '(' { LPAREN }
+  | ')' { RPAREN }
 
   | lowercase identchar* as i { ID i }
   | uppercase identchar* as i { TID i }
 
-  | '<'  { TYPE (wrapped " " " " (tag 0) lexbuf |> fst) }
-  | "{"  { CODE (wrapped " " " " (code 0 []) lexbuf) }
+  | '<' { TYPE (wrap_string_lexer (tag 0) lexbuf) }
+
+  | '{'
+    { Buffer.clear buf;
+      let s = lexbuf.lex_start_p
+      and kw  = code 0 [] lexbuf in
+      lexbuf.lex_start_p <- s;
+      CODE (Buffer.contents buf, kw) }
 
   | eof    { EOF }
   | _ as c { raise (UnexpectedInput (Some c)) }
 
-and tag depth eat = parse
-  | '[' | '(' { eat lexbuf; tag (depth + 1) eat lexbuf }
-  | ']' | ')' { eat lexbuf; tag (depth - 1) eat lexbuf }
+and tag depth = parse
+  | '[' | '(' { add_lexeme lexbuf; tag (depth + 1) lexbuf }
+  | ']' | ')' { add_lexeme lexbuf; tag (depth - 1) lexbuf }
 
-  | "->" { eat lexbuf; tag depth eat lexbuf }
-  | '>'  { if depth > 0 then (eat lexbuf; tag depth eat lexbuf) }
+  | "->" { add_lexeme lexbuf; tag depth lexbuf }
+  | '>'  { if depth > 0 then (add_lexeme lexbuf; tag depth lexbuf) }
 
-  | newline { new_line lexbuf; eat lexbuf; tag depth eat lexbuf }
+  | newline { add_newline lexbuf; tag depth lexbuf }
+  | _       { add_lexeme  lexbuf; tag depth lexbuf }
   | eof     { raise (UnexpectedInput None) }
-  | _       { eat lexbuf; tag depth eat lexbuf }
 
-and code depth kw eat = parse
-  | '[' | '(' | '{' { eat lexbuf; code (depth + 1) kw eat lexbuf }
-  | ']' | ')'       { eat lexbuf; code (depth - 1) kw eat lexbuf }
-  | "}"             { if depth > 0 then (eat lexbuf; code (depth - 1) kw eat lexbuf) else kw }
+and code depth kw = parse
+  | '[' | '(' | '{' { add_lexeme lexbuf; code (depth + 1) kw lexbuf }
+  | ']' | ')'       { add_lexeme lexbuf; code (depth - 1) kw lexbuf }
+  | '}'             { if depth > 0 then (add_lexeme lexbuf; code (depth - 1) kw lexbuf) else List.rev kw }
 
   | "$startpos"
   | "$endpos"
@@ -128,58 +136,60 @@ and code depth kw eat = parse
   | "$symbolstartofs"
   | "$loc"
   | "$sloc" as k
-    { let k = keyword_of_string k, (lexbuf.lex_start_p, lexbuf.lex_curr_p) in
-      eat lexbuf;
-      code depth (k :: kw) eat lexbuf }
+    { add_lexeme lexbuf;
+      let k = keyword_of_string k, lexbuf.lex_start_p, lexbuf.lex_curr_p in
+      code depth (k :: kw) lexbuf }
 
   | '$' (['0'-'9']+ as i)
-    { let k = KwArg (int_of_string i), (lexbuf.lex_start_p, lexbuf.lex_curr_p) in
-      eat lexbuf;
-      code depth (k :: kw) eat lexbuf }
+    { add_lexeme lexbuf;
+      let k = KwArg (int_of_string i), lexbuf.lex_start_p, lexbuf.lex_curr_p in
+      code depth (k :: kw) lexbuf }
 
-  | '"'  { eat lexbuf; string eat lexbuf;    eat lexbuf; code depth kw eat lexbuf }
-  | "(*" { eat lexbuf; comment 0 eat lexbuf; eat lexbuf; code depth kw eat lexbuf }
+  | '"'  { add_lexeme lexbuf; string lexbuf;    add_lexeme lexbuf; code depth kw lexbuf }
+  | "(*" { add_lexeme lexbuf; comment 0 lexbuf; add_lexeme lexbuf; code depth kw lexbuf }
 
-  | newline { new_line lexbuf; eat lexbuf; code depth kw eat lexbuf }
+  | newline { add_newline lexbuf; code depth kw lexbuf }
+  | _       { add_lexeme lexbuf;  code depth kw lexbuf }
   | eof     { raise (UnexpectedInput None) }
-  | _       { eat lexbuf; code depth kw eat lexbuf }
 
-and dcode depth eat = parse
-  | '[' | '(' | '{' { eat lexbuf; dcode (depth + 1) eat lexbuf }
-  | ']' | ')' | '}' { eat lexbuf; dcode (depth - 1) eat lexbuf }
-  | "%}"            { if depth > 0 then (eat lexbuf; dcode (depth - 1) eat lexbuf) }
+and dcode depth = parse
+  | "%}"            { if depth > 0 then (add_lexeme lexbuf; dcode (depth - 1) lexbuf) }
+  | '[' | '(' | '{' { add_lexeme lexbuf; dcode (depth + 1) lexbuf }
+  | ']' | ')' | '}' { add_lexeme lexbuf; dcode (depth - 1) lexbuf }
 
-  | '"'  { eat lexbuf; string eat lexbuf;    eat lexbuf; dcode depth eat lexbuf }
-  | "(*" { eat lexbuf; comment 0 eat lexbuf; eat lexbuf; dcode depth eat lexbuf }
+  | '"'  { add_lexeme lexbuf; string lexbuf;    add_lexeme lexbuf; dcode depth lexbuf }
+  | "(*" { add_lexeme lexbuf; comment 0 lexbuf; add_lexeme lexbuf; dcode depth lexbuf }
 
-  | newline { new_line lexbuf; eat lexbuf; dcode depth eat lexbuf }
+  | newline { add_newline lexbuf; dcode depth lexbuf }
+  | _       { add_lexeme  lexbuf; dcode depth lexbuf }
   | eof     { raise (UnexpectedInput None) }
-  | _       { eat lexbuf; dcode depth eat lexbuf }
 
-and string eat = parse
-  | "\\\\"  { eat lexbuf; string eat lexbuf }
-  | "\\\""  { eat lexbuf; string eat lexbuf }
+and string = parse
   | '"'     { }
-  | newline { new_line lexbuf; eat lexbuf; string eat lexbuf }
+  | "\\\\"  { add_char '\\'; string lexbuf }
+  | "\\\""  { add_char '\"'; string lexbuf }
+  | newline { add_newline lexbuf; string lexbuf }
+  | _       { add_lexeme  lexbuf; string lexbuf }
   | eof     { raise (UnexpectedInput None) }
-  | _       { eat lexbuf; string eat lexbuf }
 
-and comment depth eat = parse
-  | "(*" { eat lexbuf; comment (depth + 1) eat lexbuf }
-  | "*)" { if depth > 0 then (eat lexbuf; comment (depth - 1) eat lexbuf) }
+and comment depth = parse
+  | "(*" { add_lexeme lexbuf; comment (depth + 1) lexbuf }
+  | "*)" { if depth > 0 then (add_lexeme lexbuf; comment (depth - 1) lexbuf) }
 
-  | '"' { eat lexbuf; string eat lexbuf; eat lexbuf; comment depth eat lexbuf }
+  | '"' { add_lexeme lexbuf; string lexbuf; add_lexeme lexbuf; comment depth lexbuf }
 
-  | newline  { new_line lexbuf; eat lexbuf; comment depth eat lexbuf }
+  | newline  { add_newline lexbuf; comment depth lexbuf }
+  | _        { add_lexeme  lexbuf; comment depth lexbuf }
   | eof      { raise (UnexpectedInput None) }
-  | _        { eat lexbuf; comment depth eat lexbuf }
 
-and ccomment = parse
+(* C-style block comments - for ocamlyacc compability *)
+and c_comment = parse
   | "*/" { }
   | eof  { raise (UnexpectedInput None) }
-  | _    { ccomment lexbuf }
+  | _    { c_comment lexbuf }
 
-and ccomment_line = parse
+(* C-style line comments - for ocamlyacc compability *)
+and c_line_comment = parse
   | "\n" { }
   | eof  { raise (UnexpectedInput None) }
-  | _    { ccomment_line lexbuf }
+  | _    { c_line_comment lexbuf }

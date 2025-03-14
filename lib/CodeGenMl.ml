@@ -194,18 +194,18 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
     loop 0 xs
   ;;
 
-  let write_line_directive f (loc, _) =
+  let write_line_directive f ofs (loc, _) =
     Format.fprintf
       f
       "\n# %d \"%s\"\n%s"
       loc.Lexing.pos_lnum
       loc.Lexing.pos_fname
-      (String.make (loc.pos_cnum - loc.pos_bol) ' ')
+      (String.make (loc.pos_cnum - loc.pos_bol + ofs) ' ')
   ;;
 
-  let write_string f { loc; data } =
+  let write_string f ofs { span; data } =
     if S.line_directives
-    then Format.fprintf f "%t%s" (fun f -> write_line_directive f loc) data
+    then Format.fprintf f "%t%s" (fun f -> write_line_directive f ofs span) data
     else Format.fprintf f "%s" (String.trim data)
   ;;
 
@@ -378,13 +378,13 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
 
   let write_term_cons f = function
     | { ti_name; ti_ty = None; _ } ->
-      Format.fprintf f "  | %t\n" (fun f -> write_string f ti_name)
+      Format.fprintf f "  | %t\n" (fun f -> write_string f 0 ti_name)
     | { ti_name; ti_ty = Some ty; _ } ->
       Format.fprintf
         f
         "  | %t of (%t)\n"
-        (fun f -> write_string f ti_name)
-        (fun f -> write_string f ty)
+        (fun f -> write_string f 0 ti_name)
+        (fun f -> write_string f 1 ty)
   ;;
 
   let write_term_type f symbols =
@@ -400,11 +400,18 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
 
   let write_semantic_action_code f action =
     let n = List.length action.sa_args
-    and code = action.sa_code in
-    let write_part f l r =
+    and code, keywords = action.sa_code.data in
+    let s, e = action.sa_code.span in
+    let s, e =
+      { s with pos_cnum = s.pos_cnum + 1 }, { e with pos_cnum = e.pos_cnum - 1 }
+    in
+    let write_part f i l r =
       let len = r.Lexing.pos_cnum - l.Lexing.pos_cnum
-      and ofs = l.pos_cnum - (fst action.sa_code.loc).pos_cnum in
-      write_string f { data = String.sub (fst code.data) ofs len; loc = l, r }
+      and ofs = l.pos_cnum - s.pos_cnum in
+      write_string
+        f
+        (if i > 0 then 0 else 1)
+        { data = String.sub code ofs len; span = l, r }
     and get_impl = function
       | Raw.KwArg i ->
         (match List.nth_opt action.sa_args (i - 1) with
@@ -420,15 +427,15 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
       | Raw.KwLoc -> Printf.sprintf "_kw_loc ~loc:_loc %d" n
       | Raw.KwSloc -> Printf.sprintf "_kw_sloc ~loc:_loc %d" n
     in
-    let rec loop pos = function
-      | [] -> write_part f pos (snd code.loc)
-      | (kw, loc) :: kws ->
-        write_part f pos (fst loc);
+    let rec loop i pos = function
+      | [] -> write_part f i pos e
+      | (kw, l, r) :: kws ->
+        write_part f i pos l;
         let impl = get_impl kw in
         Format.fprintf f "(%s) " impl;
-        loop (snd loc) kws
+        loop (i + 1) r kws
     in
-    loop (fst action.sa_code.loc) (snd action.sa_code.data |> List.rev)
+    loop 0 s keywords
   ;;
 
   let write_semantic_action f id action =
@@ -518,7 +525,7 @@ module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) :
        %s"
       prelude
       (fun f -> if S.compat then Format.fprintf f "%s\n\n" parsing_compat_mod)
-      (fun f -> List.iter (write_string f) A.automaton.a_header)
+      (fun f -> List.iter (write_string f 2) A.automaton.a_header)
       (fun f -> write_term_type f G.symbols)
       action_lib
       (fun f -> IntMap.iter (write_semantic_action f) A.automaton.a_actions)

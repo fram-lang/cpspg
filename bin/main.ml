@@ -5,8 +5,16 @@ module Raw = struct
   let lexbuf = Lexing.from_channel input
   let _ = Lexing.set_filename lexbuf input_name
 
+  let lexfun_debug lexbuf =
+    let token = Cpspg.Lexer.main lexbuf in
+    Cpspg.Debug.debug_token token lexbuf;
+    token
+  ;;
+
+  let lexfun = if Opts.debug = "tokens" then lexfun_debug else Cpspg.Lexer.main
+
   let raw =
-    try Cpspg.Parser.grammar Cpspg.Lexer.main lexbuf with
+    try Cpspg.Parser.grammar lexfun lexbuf with
     | Parsing.Parse_error ->
       let loc = lexbuf.lex_start_p, lexbuf.lex_curr_p
       and lex = Lexing.lexeme lexbuf

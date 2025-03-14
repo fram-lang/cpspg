@@ -1,8 +1,9 @@
 module Parse () = struct
   let usage =
-    "usage:\n\
+    "Usage:\n\
     \  cpspg [options] <input> [output...]\n\
-    \  cpspg [options] [-f format] -o <output> <input>\n"
+    \  cpspg [options] [-f format] -o <output> <input>\n\n\
+     Options:"
   ;;
 
   let input_name = ref None
@@ -14,6 +15,7 @@ module Parse () = struct
   let codegen_readable_ids = ref false
   let codegen_locations = ref true
   let codegen_compat = ref false
+  let debug = ref ""
 
   let codegen_readable () =
     codegen_line_directives := false;
@@ -65,11 +67,26 @@ module Parse () = struct
     ; ( "--compat"
       , Arg.Set codegen_compat
       , "\tGenerate code with OCaml's Parsing module compability" )
+    ; "-Z", Arg.Set_string debug, "<flag>\t[INTERNAL]"
     ]
     |> Arg.align
   ;;
 
-  let _ = Arg.parse specs positional_arg usage
+  let skip_internal msg =
+    String.split_on_char '\n' msg
+    |> List.filter (fun l -> not (String.ends_with ~suffix:"[INTERNAL]" l))
+    |> String.concat "\n"
+  ;;
+
+  let _ =
+    try Arg.parse_argv Sys.argv specs positional_arg usage with
+    | Arg.Bad msg ->
+      Printf.eprintf "%s" msg;
+      exit 2
+    | Arg.Help msg ->
+      Printf.printf "%s" (skip_internal msg);
+      exit 0
+  ;;
 
   (* Forward parsed options *)
   let input =
@@ -96,4 +113,5 @@ module Parse () = struct
   let line_directives = !codegen_line_directives
   let comments = !codegen_comments
   let readable_ids = !codegen_readable_ids
+  let debug = !debug
 end

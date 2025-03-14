@@ -3,8 +3,8 @@
 open Raw
 
 let plus, star, qmark =
-  let loc = Lexing.dummy_pos, Lexing.dummy_pos in
-  let sym data = { loc; data = NTerm data } in
+  let span = Lexing.dummy_pos, Lexing.dummy_pos in
+  let sym data = { span; data = NTerm data } in
   sym "nonempty_list", sym "list", sym "option"
 ;;
 
@@ -27,10 +27,10 @@ grammar:
 ;
 
 decl:
-  | data=DCODE               { DeclCode { loc=$loc; data } }
+  | data=node(DCODE)         { DeclCode data }
   | DTOKEN tp=tp? xs=tid*    { DeclToken (tp, xs) }
   | DSTART tp=tp? xs=id*     { DeclStart (tp, xs) }
-  | DTYPE  tp=tp  xs=symbol* { DeclType (tp, xs) }
+  | DTYPE  tp=tp  xs=symbol* { DeclType  (tp, xs) }
   | DLEFT         xs=ident*  { DeclLeft xs }
   | DRIGHT        xs=ident*  { DeclRight xs }
   | DNONASSOC     xs=ident*  { DeclNonassoc xs }
@@ -97,8 +97,8 @@ arg:
 ;
 
 symbol:
-  | x=ID  { { loc = $loc; data = NTerm x } }
-  | x=TID { { loc = $loc; data = Term x } }
+  | x=ID  { { span = $loc; data = NTerm x } }
+  | x=TID { { span = $loc; data = Term x } }
 ;
 
 ident:
@@ -111,4 +111,4 @@ ident:
 %inline tp:   node(TYPE) { $1 };
 %inline code: node(CODE) { $1 };
 
-%inline node(X): data=X { { loc = $loc; data } };
+%inline node(X): data=X { { span = $loc; data } };

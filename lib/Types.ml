@@ -8,20 +8,22 @@ module IntMap = Map.Make (Int)
 
 module type Logger = sig
   (* Warning and error reporting *)
-  val report_err : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
-  val report_warn : ?loc:Automaton.loc -> ('a, Format.formatter, unit) format -> 'a
+  val report_err : ?loc:Automaton.span -> ('a, Format.formatter, unit) format -> 'a
+  val report_warn : ?loc:Automaton.span -> ('a, Format.formatter, unit) format -> 'a
   val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
 end
 
 module type FrontSettings = sig
   include Logger
 
+  val debug : string
   val kind : kind
 end
 
 module type BackSettings = sig
   include Logger
 
+  val debug : string
   val locations : bool
   val compat : bool
   val line_directives : bool

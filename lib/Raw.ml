@@ -1,7 +1,7 @@
-type loc = Lexing.position * Lexing.position
+type span = Lexing.position * Lexing.position
 
 type 'a node =
-  { loc : loc
+  { span : span
   ; data : 'a
   }
 
@@ -16,7 +16,7 @@ type keyword =
   | KwLoc
   | KwSloc
 
-type code = string * (keyword * loc) list
+type code = string * (keyword * Lexing.position * Lexing.position) list
 
 type symbol =
   | NTerm of string

@@ -29,11 +29,14 @@
   (run cpspg -o %{target} %{deps})))
 
 (test
-  (name When)
-  (libraries alcotest))
+ (name When)
+ (libraries alcotest))
 
 (rule
  (target WhenParser.ml)
  (deps When.mly)
  (action
   (run cpspg -o %{target} %{deps})))
+
+(cram
+ (deps Syntax.mly))

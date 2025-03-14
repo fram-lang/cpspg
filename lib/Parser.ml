@@ -5,8 +5,8 @@
 open Raw
 
 let plus, star, qmark =
-  let loc = Lexing.dummy_pos, Lexing.dummy_pos in
-  let sym data = { loc; data = NTerm data } in
+  let span = Lexing.dummy_pos, Lexing.dummy_pos in
+  let sym data = { span; data = NTerm data } in
   sym "nonempty_list", sym "list", sym "option"
 ;;
 
@@ -57,8 +57,8 @@ module Actions = struct
   let _kw_symbolstartofs ~loc:_ _ = failwith "unimplemented: $symbolstartofs"
   let _kw_loc ~loc n = _kw_startpos ~loc n, _kw_endpos ~loc n
   let _kw_sloc ~loc:_ _ = failwith "unimplemented: $sloc"
-  let a0 ~loc:_loc data () = (DeclCode { loc=(_kw_loc ~loc:_loc 1) ; data })
-  let a1 ~loc:_loc data () = ({ loc =(_kw_loc ~loc:_loc 1) ; data })
+  let a0 ~loc:_loc data () = ({ span =(_kw_loc ~loc:_loc 1) ; data })
+  let a1 ~loc:_loc data () = (DeclCode data)
   let a2 ~loc:_loc _arg1 () = ((_arg1) )
   let a3 ~loc:_loc () = (None)
   let a4 ~loc:_loc x () = (Some x)
@@ -68,9 +68,9 @@ module Actions = struct
   let a8 ~loc:_loc xs tp _arg1 () = (DeclToken (tp, xs))
   let a9 ~loc:_loc _arg1 () = ((_arg1) )
   let a10 ~loc:_loc xs tp _arg1 () = (DeclStart (tp, xs))
-  let a11 ~loc:_loc x () = ({ loc =(_kw_loc ~loc:_loc 1) ; data = NTerm x })
-  let a12 ~loc:_loc x () = ({ loc =(_kw_loc ~loc:_loc 1) ; data = Term x })
-  let a13 ~loc:_loc xs tp _arg1 () = (DeclType (tp, xs))
+  let a11 ~loc:_loc x () = ({ span =(_kw_loc ~loc:_loc 1) ; data = NTerm x })
+  let a12 ~loc:_loc x () = ({ span =(_kw_loc ~loc:_loc 1) ; data = Term x })
+  let a13 ~loc:_loc xs tp _arg1 () = (DeclType  (tp, xs))
   let a14 ~loc:_loc x () = (x)
   let a15 ~loc:_loc x () = (x)
   let a16 ~loc:_loc xs _arg1 () = (DeclLeft xs)
@@ -243,7 +243,7 @@ module States = struct
     (* Reduce *)
     | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP ->
       let loc = loc_reduce ~loc 1
-      and x = Actions.a0 ~loc a0_DCODE () in
+      and x = Actions.a1 ~loc (Actions.a0 ~loc a0_DCODE ()) () in
       _c0_decl ~loc x
     | _ -> fail [ "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP" ]
 
@@ -283,7 +283,7 @@ module States = struct
     (* Reduce *)
     | ID _ | TID _ | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP ->
       let loc = loc_reduce ~loc 1
-      and x = Actions.a4 ~loc (Actions.a2 ~loc (Actions.a1 ~loc a0_TYPE ()) ()) () in
+      and x = Actions.a4 ~loc (Actions.a2 ~loc (Actions.a0 ~loc a0_TYPE ()) ()) () in
       _c0_option ~loc x
     | _ -> fail [ "ID"; "TID"; "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP" ]
 
@@ -348,7 +348,7 @@ module States = struct
     (* Reduce *)
     | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP ->
       let loc = loc_reduce ~loc 2
-      and x = Actions.a7 ~loc a0_list (Actions.a5 ~loc (Actions.a1 ~loc a1_TID ()) ()) () in
+      and x = Actions.a7 ~loc a0_list (Actions.a5 ~loc (Actions.a0 ~loc a1_TID ()) ()) () in
       _c0_list ~loc x
     | _ -> fail [ "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP" ]
 
@@ -508,7 +508,7 @@ module States = struct
     (* Reduce *)
     | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP ->
       let loc = loc_reduce ~loc 3
-      and x = Actions.a13 ~loc a0_list (Actions.a2 ~loc (Actions.a1 ~loc a1_TYPE ()) ()) () () in
+      and x = Actions.a13 ~loc a0_list (Actions.a2 ~loc (Actions.a0 ~loc a1_TYPE ()) ()) () () in
       _c0_decl ~loc x
     | _ -> fail [ "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP" ]
 
@@ -598,7 +598,7 @@ module States = struct
     (* Reduce *)
     | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP ->
       let loc = loc_reduce ~loc 2
-      and x = Actions.a7 ~loc a0_list (Actions.a9 ~loc (Actions.a1 ~loc a1_ID ()) ()) () in
+      and x = Actions.a7 ~loc a0_list (Actions.a9 ~loc (Actions.a0 ~loc a1_ID ()) ()) () in
       _c0_list ~loc x
     | _ -> fail [ "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP" ]
 
@@ -663,7 +663,7 @@ module States = struct
     (* Reduce *)
     | ID _ | TID _ | CODE _ | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP | DWHEN ->
       let loc = loc_reduce ~loc 1
-      and x = Actions.a14 ~loc (Actions.a1 ~loc a0_ID ()) () in
+      and x = Actions.a14 ~loc (Actions.a0 ~loc a0_ID ()) () in
       _c0_ident ~loc x
     | _ -> fail [ "ID"; "TID"; "CODE"; "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP"; "DWHEN" ]
 
@@ -678,7 +678,7 @@ module States = struct
     (* Reduce *)
     | ID _ | TID _ | CODE _ | DCODE _ | DTOKEN | DTYPE | DSTART | DLEFT | DRIGHT | DNONASSOC | DSEP | DWHEN ->
       let loc = loc_reduce ~loc 1
-      and x = Actions.a15 ~loc (Actions.a1 ~loc a0_TID ()) () in
+      and x = Actions.a15 ~loc (Actions.a0 ~loc a0_TID ()) () in
       _c0_ident ~loc x
     | _ -> fail [ "ID"; "TID"; "CODE"; "DCODE"; "DTOKEN"; "DTYPE"; "DSTART"; "DLEFT"; "DRIGHT"; "DNONASSOC"; "DSEP"; "DWHEN" ]
 
@@ -1858,7 +1858,7 @@ module States = struct
     (* Reduce *)
     | COMMA | RPAREN ->
       let loc = loc_reduce ~loc 2
-      and x = Actions.a37 ~loc (Actions.a36 ~loc (Actions.a1 ~loc a0_CODE ()) ()) a1_list () in
+      and x = Actions.a37 ~loc (Actions.a36 ~loc (Actions.a0 ~loc a0_CODE ()) ()) a1_list () in
       _c0_arg ~loc x
     | _ -> fail [ "COMMA"; "RPAREN" ]
 
@@ -1997,7 +1997,7 @@ module States = struct
     (* Reduce *)
     | ID _ | TID _ | CODE _ | DWHEN | DPREC ->
       let loc = loc_reduce ~loc 4
-      and x = Actions.a40 ~loc a0_list a1_actual (Actions.a30 ~loc (Actions.a28 ~loc () (Actions.a9 ~loc (Actions.a1 ~loc a3_ID ()) ()) ()) ()) () in
+      and x = Actions.a40 ~loc a0_list a1_actual (Actions.a30 ~loc (Actions.a28 ~loc () (Actions.a9 ~loc (Actions.a0 ~loc a3_ID ()) ()) ()) ()) () in
       _c0_producer ~loc x
     | _ -> fail [ "ID"; "TID"; "CODE"; "DWHEN"; "DPREC" ]
 
@@ -2265,7 +2265,7 @@ module States = struct
     (* Reduce *)
     | ID _ | CODE _ | DWHEN | DINLINE | BAR | SEMI | EOF ->
       let loc = loc_reduce ~loc 5
-      and x = Actions.a42 ~loc (Actions.a36 ~loc (Actions.a1 ~loc a0_CODE ()) ()) a1_symbol () a3_symbol () () in
+      and x = Actions.a42 ~loc (Actions.a36 ~loc (Actions.a0 ~loc a0_CODE ()) ()) a1_symbol () a3_symbol () () in
       _c0_conditional_action ~loc x
     | _ -> fail [ "ID"; "CODE"; "DWHEN"; "DINLINE"; "BAR"; "SEMI"; "EOF" ]
 
@@ -2395,7 +2395,7 @@ module States = struct
     (* Reduce *)
     | ID _ | DINLINE | BAR | SEMI | EOF ->
       let loc = loc_reduce ~loc 2
-      and x = Actions.a46 ~loc (Actions.a36 ~loc (Actions.a1 ~loc a0_CODE ()) ()) a1_list () in
+      and x = Actions.a46 ~loc (Actions.a36 ~loc (Actions.a0 ~loc a0_CODE ()) ()) a1_list () in
       _c0_actions ~loc x
     | _ -> fail [ "ID"; "DINLINE"; "BAR"; "SEMI"; "EOF" ]
 
@@ -2450,7 +2450,7 @@ module States = struct
     (* Reduce *)
     | ID _ | DINLINE | EOF ->
       let loc = loc_reduce ~loc 7
-      and x = Actions.a48 ~loc a0_list a1_separated_nonempty_list a2_option () a4_loption (Actions.a9 ~loc (Actions.a1 ~loc a5_ID ()) ()) a6_boption () in
+      and x = Actions.a48 ~loc a0_list a1_separated_nonempty_list a2_option () a4_loption (Actions.a9 ~loc (Actions.a0 ~loc a5_ID ()) ()) a6_boption () in
       _c0_rule ~loc x
     | _ -> fail [ "ID"; "DINLINE"; "EOF" ]
 

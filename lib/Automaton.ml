@@ -40,10 +40,10 @@ module SymbolMap = Map.Make (Symbol)
 module TermSet = Set.Make (Terminal)
 module IntMap = Map.Make (Int)
 
-type loc = Raw.loc
+type span = Raw.span
 
 type 'a node = 'a Raw.node =
-  { loc : loc
+  { span : span
   ; data : 'a
   }
 

@@ -90,7 +90,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let prec = Hashtbl.create 64 in
     let iter_sym p sym =
       if Hashtbl.mem prec sym.data
-      then S.report_warn ~loc:sym.loc "duplicate precedence %s" sym.data;
+      then S.report_warn ~loc:sym.span "duplicate precedence %s" sym.data;
       Hashtbl.replace prec sym.data p
     in
     let iter i = function
@@ -108,9 +108,9 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let add_type typ id =
       match Hashtbl.find_opt types id.data with
       | Some ty when ty <> typ ->
-        S.report_err ~loc:id.loc "conflicting types for symbol %s" (sym_name id.data)
+        S.report_err ~loc:id.span "conflicting types for symbol %s" (sym_name id.data)
       | Some _ ->
-        S.report_warn ~loc:id.loc "multiple types for symbol %s" (sym_name id.data)
+        S.report_warn ~loc:id.span "multiple types for symbol %s" (sym_name id.data)
       | _ -> Hashtbl.add types id.data typ
     in
     let add_nterm_type typ s = add_type typ { s with data = NTerm s.data } in
@@ -130,7 +130,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
       let prec = Hashtbl.find_opt prec name.data in
       let info = { ti_name = name; ti_ty = ty; ti_prec = prec } in
       if Hashtbl.mem term name.data
-      then S.report_warn ~loc:name.loc "duplicate terminal symbol %s" name.data
+      then S.report_warn ~loc:name.span "duplicate terminal symbol %s" name.data
       else Hashtbl.add term name.data (Hashtbl.length term |> Terminal.of_int, info)
     in
     let iter_decl = function
@@ -147,7 +147,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let iter_rule rule =
       let name = rule.r_id in
       if Hashtbl.mem rules name.data
-      then S.report_warn ~loc:name.loc "duplicate rule %s" name.data
+      then S.report_warn ~loc:name.span "duplicate rule %s" name.data
       else Hashtbl.add rules name.data rule
     and iter_std rule =
       let name = rule.r_id in
@@ -178,7 +178,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     match Hashtbl.find_opt term name.data with
     | Some (t, _) -> t
     | None ->
-      S.report_err ~loc:name.loc "unknown terminal symbol %s" name.data;
+      S.report_err ~loc:name.span "unknown terminal symbol %s" name.data;
       Terminal.dummy
   ;;
 
@@ -201,7 +201,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let get symbol =
       match tr_actual env { a_symbol = symbol; a_args = [] } with
       | VInline _ ->
-        S.report_err ~loc:symbol.loc "inline symbols are not allowed in conditions";
+        S.report_err ~loc:symbol.span "inline symbols are not allowed in conditions";
         None
       | VDummy -> None
       | value -> Some value
@@ -241,7 +241,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let get_nterm id args =
       match Hashtbl.find_opt rules id.data with
       | None ->
-        S.report_err ~loc:id.loc "unknown nonterminal symbol %s" id.data;
+        S.report_err ~loc:id.span "unknown nonterminal symbol %s" id.data;
         VDummy
       | Some rule when args = [] && rule.r_params <> [] -> VRule rule
       | Some rule -> tr_args env actual.a_args |> instantiate rule
@@ -251,11 +251,11 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
       instantiate rule (tr_args env actual.a_args)
     | _, Some value ->
       if actual.a_args <> []
-      then S.report_err ~loc:sym.loc "this value does not accept arguments";
+      then S.report_err ~loc:sym.span "this value does not accept arguments";
       value
     | Raw.Term t, None ->
       if actual.a_args <> []
-      then S.report_err ~loc:sym.loc "terminal symbols do not accept arguments";
+      then S.report_err ~loc:sym.span "terminal symbols do not accept arguments";
       VSymbol (Term (tr_term { sym with data = t }))
     | Raw.NTerm id, None -> get_nterm { sym with data = id } actual.a_args
 
@@ -292,7 +292,7 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     | None ->
       let id = InstanceMap.length nterm_id |> Nonterminal.of_int in
       InstanceMap.add nterm_id (rule, args) id;
-      let env = init_env rule.r_id.loc rule.r_params args in
+      let env = init_env rule.r_id.span rule.r_params args in
       let items = List.map (tr_production env) rule.r_prods |> List.flatten in
       let info =
         { ni_name = rule.r_id
@@ -316,20 +316,20 @@ module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
     let start name rule =
       match instantiate rule [] with
       | VDummy | VSymbol (Term _) ->
-        S.report_err ~loc:name.loc "starting rule %s is invalid" name.data
+        S.report_err ~loc:name.span "starting rule %s is invalid" name.data
       | VRule _ ->
-        S.report_err ~loc:name.loc "starting rule %s cannot accept parameters" name.data
+        S.report_err ~loc:name.span "starting rule %s cannot accept parameters" name.data
       | VInline _ ->
-        S.report_err ~loc:name.loc "starting rule %s cannot be inline" name.data
+        S.report_err ~loc:name.span "starting rule %s cannot be inline" name.data
       | VSymbol (NTerm id) ->
         let info, group = Hashtbl.find nterm_info id in
         if info.ni_starting
-        then S.report_warn ~loc:name.loc "duplicate start declaration of %s" name.data
+        then S.report_warn ~loc:name.span "duplicate start declaration of %s" name.data
         else Hashtbl.replace nterm_info id ({ info with ni_starting = true }, group)
     in
     let iter_start name =
       match Hashtbl.find_opt rules name.data with
-      | None -> S.report_err ~loc:name.loc "unknown starting symbol %s" name.data
+      | None -> S.report_err ~loc:name.span "unknown starting symbol %s" name.data
       | Some rule -> start name rule
     in
     let iter_decl = function
