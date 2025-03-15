@@ -116,7 +116,7 @@ end = struct
   let follow sym = SymbolMap.find_opt sym follow |> Option.value ~default:TermSet.empty
 end
 
-module Run (S : Types.FrontSettings) (G : Types.Grammar) : Types.Automaton = struct
+module Run (S : Types.BackendSettings) (G : Types.Grammar) : Types.Automaton = struct
   open Automaton
 
   let nullable =

@@ -13,14 +13,14 @@ module type Logger = sig
   val report_conflict : int -> Automaton.Terminal.t -> Automaton.action list -> unit
 end
 
-module type FrontSettings = sig
+module type BackendSettings = sig
   include Logger
 
   val debug : string
   val kind : kind
 end
 
-module type BackSettings = sig
+module type BackEndSettings = sig
   include Logger
 
   val debug : string
@@ -31,6 +31,7 @@ module type BackSettings = sig
   val readable_ids : bool
 
   (* Output *)
+  val name : string
   val out : out_channel
 end
 

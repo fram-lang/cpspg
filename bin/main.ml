@@ -47,14 +47,15 @@ let write (out, name, format) =
     include Logger
     include Opts
 
+    let name = name
     let out = out
   end
   in
   let module Code =
     (val match format with
-         | ".ml" -> (module Cpspg.CodeGenMl.Make (Settings) (Grammar) (Automaton))
-         | ".mli" -> (module Cpspg.CodeGenMli.Make (Settings) (Grammar) (Automaton))
-         | ".dot" -> (module Cpspg.CodeGenDot.Make (Settings) (Grammar) (Automaton))
+         | ".ml" -> (module Cpspg.Backend.Ml.Make (Settings) (Grammar) (Automaton))
+         | ".mli" -> (module Cpspg.Backend.Mli.Make (Settings) (Grammar) (Automaton))
+         | ".dot" -> (module Cpspg.Backend.Dot.Make (Settings) (Grammar) (Automaton))
          | _ ->
            if format == ""
            then Logger.report_err "could not determine output format for %s" name

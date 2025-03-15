@@ -1,14 +1,16 @@
 (library
  (name cpspg))
 
+(include_subdirs qualified)
+
 (ocamllex
  (modules Lexer))
 
 (rule
  (deps Parser.mly)
- (target Parser.cpspg.ml)
+ (targets Parser.cpspg.ml Parser.cpspg.mli)
  (action
-  (run cpspg --readable -o %{target} %{deps})))
+  (run cpspg --readable %{deps} %{targets})))
 
 (rule
  (deps Standard.mly)
@@ -24,4 +26,6 @@
 (rule
  (alias bootstrap)
  (action
-  (diff Parser.ml Parser.cpspg.ml)))
+  (progn
+   (diff Parser.ml Parser.cpspg.ml)
+   (diff Parser.mli Parser.cpspg.mli))))

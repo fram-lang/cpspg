@@ -60,7 +60,7 @@ module InstanceMap = Hashtbl.Make (struct
     let hash (r, vs) = Hashtbl.hash (Rule.hash r, List.map Value.hash vs)
   end)
 
-module Run (S : Types.FrontSettings) (R : Types.Raw) : Types.Grammar = struct
+module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
   open Raw
   open Automaton
 

@@ -7,8 +7,8 @@ module type DotCode = sig
   val fmt_state_actions : Format.formatter -> Automaton.state -> unit
 end
 
-module Make (S : Types.BackSettings) (G : Types.Grammar) (A : Types.Automaton) : DotCode =
-struct
+module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton) :
+  DotCode = struct
   open Automaton
 
   let term_name t = if t == Terminal.dummy then "<DUMMY>" else (G.term t).ti_name.data
@@ -46,14 +46,14 @@ struct
   ;;
 
   let fmt_state_actions f state =
-    let fmt_sym t = Format.fprintf f " %s" (term_name t)
+    let fmt_sym t = Format.fprintf f "%s " (term_name t)
     and fmt_state_action = function
       | Shift -> Format.fprintf f "shift"
       | Reduce (i, j) -> Format.fprintf f "reduce %d %d" i j
     in
     let fmt_action (la, action) =
       TermSet.iter fmt_sym la;
-      Format.fprintf f " -> ";
+      Format.fprintf f "-> ";
       fmt_state_action action;
       Format.fprintf f "\n"
     in
