@@ -67,7 +67,7 @@ type semantic_action_call =
 (** Suffix of LR(0)/LR(1) *)
 type item =
   { i_suffix : symbol list
-  ; i_action : semantic_action_call option
+  ; i_action : semantic_action_call
   ; i_prec : prec option
   }
 
@@ -174,19 +174,4 @@ let shift_state symbol state =
   | [] -> None
   | kernel ->
     Some { s_kernel = kernel; s_closure = []; s_goto = SymbolMap.empty; s_action = [] }
-;;
-
-let item_of_starting_symbol symbol =
-  { i_suffix = [ NTerm symbol ]; i_action = None; i_prec = None }
-;;
-
-let group_of_starting_symbol symbol =
-  let g_items = [ item_of_starting_symbol symbol ]
-  and g_lookahead = TermSet.empty in
-  { g_symbol = symbol; g_prefix = []; g_items; g_lookahead; g_starting = true }
-;;
-
-let state_of_starting_symbol symbol =
-  let kernel = [ group_of_starting_symbol symbol ] in
-  { s_kernel = kernel; s_closure = []; s_goto = SymbolMap.empty; s_action = [] }
 ;;

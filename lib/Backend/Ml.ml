@@ -340,15 +340,11 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     List.rev_append acc [ PP.ExprUnit ]
   ;;
 
-  let make_semantic_action_call group = function
-    | { i_action = None; _ } ->
-      assert (List.length group.g_prefix = 1);
-      make_args_ids group.g_prefix |> List.hd
-    | { i_action = Some a; _ } ->
-      let action = IntMap.find a.ac_id A.automaton.a_actions in
-      let name = semantic_action_id action a.ac_id |> Printf.sprintf "Actions.%s" in
-      let args = make_semantic_action_args a.ac_args group.g_prefix |> with_loc in
-      PP.ExprCall (name, args)
+  let make_semantic_action_call group { i_action = a; _ } =
+    let action = IntMap.find a.ac_id A.automaton.a_actions in
+    let name = semantic_action_id action a.ac_id |> Printf.sprintf "Actions.%s" in
+    let args = make_semantic_action_args a.ac_args group.g_prefix |> with_loc in
+    PP.ExprCall (name, args)
   ;;
 
   let make_action_shift state sym =

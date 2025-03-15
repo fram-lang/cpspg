@@ -216,22 +216,23 @@ module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
     List.find_map f actions
 
   and tr_values values =
-    let append_one x xxs = List.map (fun xs -> x :: xs) xxs
-    and append_some yys xxs =
-      List.map (fun ys -> List.map (List.rev_append ys) xxs) yys |> List.flatten
-    in
+    let rev_append_each ys xxs = List.map (fun xs -> List.rev_append ys xs) xxs in
+    (* [prepend_one x xxs] appends [x] to each list [xs] in [xxs] *)
+    let prepend_one x xxs = List.map (fun xs -> x :: xs) xxs
+    (* [prepend_some yys xxs] prepends each list [ys] in [yys] to each list [xs] in [xxs] *)
+    and prepend_some yys xxs = List.concat_map (fun ys -> rev_append_each ys xxs) yys in
     let f (sym, arg) = function
       | VDummy ->
         let s = Term Terminal.dummy in
-        append_one s sym, append_one None arg
+        prepend_one s sym, prepend_one None arg
       | VRule _ ->
         let s = Term Terminal.dummy in
-        append_one s sym, append_one None arg
-      | VSymbol s -> append_one s sym, append_one None arg
+        prepend_one s sym, prepend_one None arg
+      | VSymbol s -> prepend_one s sym, prepend_one None arg
       | VInline items ->
         let s = List.map (fun i -> i.i_suffix) items
-        and a = List.map (fun i -> [ i.i_action ]) items in
-        append_some s sym, append_some a arg
+        and a = List.map (fun i -> [ Some i.i_action ]) items in
+        prepend_some s sym, prepend_some a arg
     in
     let sym, arg = List.fold_left f ([ [] ], [ [] ]) values in
     List.map List.rev sym, List.map List.rev arg
@@ -265,7 +266,7 @@ module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
     let get_group suffix args =
       match tr_actions env prod.p_prod prod.p_actions with
       | Some action ->
-        let action = Some { ac_id = action; ac_args = args }
+        let action = { ac_id = action; ac_args = args }
         and prec = Option.bind prod.p_prec get_prec in
         Some { i_suffix = suffix; i_action = action; i_prec = prec }
       | None -> None
