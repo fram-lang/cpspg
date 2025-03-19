@@ -116,9 +116,10 @@ module Ml (S : Types.BackEndSettings) = struct
     Printf.sprintf "# %d \"%s\"\n%s" l f (String.make c ' ') |> output_string_raw
   ;;
 
-  let pp_string_node { Raw.span = loc, _; data } =
+  let pp_string_node ?(trim = true) { Raw.span = loc, _; data } =
     match loc with
-    | _ when not S.line_directives -> output_string (String.trim data)
+    | _ when (not S.line_directives) && trim -> output_string (String.trim data)
+    | _ when not S.line_directives -> output_string data
     | loc when loc = Lexing.dummy_pos -> output_string data
     | loc ->
       pp_line_directive loc.pos_fname loc.pos_lnum (loc.pos_cnum - loc.pos_bol);
@@ -170,7 +171,9 @@ module Ml (S : Types.BackEndSettings) = struct
       pp_expr expr;
       output_string " with\n";
       iter_sep pp_case print_newline cases
-    | ExprVerbatim data -> List.iter pp_string_node data
+    | ExprVerbatim data ->
+      let trim = List.length data = 1 in
+      List.iter (pp_string_node ~trim) data
 
   and pp_binding bl { name; args; expr; comment = _ } =
     let pp_arg a =

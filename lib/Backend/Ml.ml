@@ -119,50 +119,38 @@ let _kw_sloc ~_loc _ = failwith "not implemented: $sloc"
 let state_lib = {|
 let lexfun = ref (fun _ -> assert false)
 let lexbuf = ref (Lexing.from_string String.empty)
-let peeked = ref None
-let lexbuf_fallback_p = ref Lexing.dummy_pos
+
 let error_token = ref None
 let expected_tokens = ref []
 
 let setup lf lb =
   lexfun := lf;
   lexbuf := lb;
-  peeked := None;
-  lexbuf_fallback_p := !lexbuf.lex_curr_p;
   error_token := None;
   expected_tokens := []
 ;;
 
 let shift () =
-  let sym = Option.get !peeked in
-  peeked := None;
-  lexbuf_fallback_p := !lexbuf.lex_curr_p;
-  sym
+  let tok = !lexfun !lexbuf in
+  let loc = !lexbuf.lex_start_p, !lexbuf.lex_curr_p in
+  tok, loc
 ;;
 
-let peek () =
-  match !peeked with
-  | Some p -> p
-  | None ->
-    let tok = !lexfun !lexbuf
-    and loc = !lexbuf.lex_start_p, !lexbuf.lex_curr_p in
-    peeked := Some (tok, loc);
-    tok, loc
-;;
-
-let lookahead () = fst (peek ())
-
-let fail expected =
-  let token, _ = peek () in
-  error_token := Some token;
+let fail token expected =
+  error_token := Some (fst token);
   expected_tokens := expected;
   raise Parsing.Parse_error
 ;;
 
 let loc_shift ~_loc l = l :: _loc
 
+let loc_dummy = function
+  | [] -> Lexing.dummy_pos, Lexing.dummy_pos
+  | (_, e) :: _ -> e, e
+;;
+
 let loc_reduce ~_loc = function
-  | 0 -> (!lexbuf_fallback_p, !lexbuf_fallback_p) :: _loc
+  | 0 -> loc_dummy _loc :: _loc
   | n ->
     let l = fst (List.nth _loc (n - 1)), snd (List.hd _loc) in
     ParsingCompat.set_loc _loc n;
@@ -283,14 +271,16 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
       | None -> PP.ExprId (Printf.sprintf "_arg%d" (i + 1))
     in
     let args = rev_mapi aux 0 [ PP.ExprUnit ] action.sa_args in
-    let args = if S.locations then PP.ExprLabeled "_loc" :: args else args in
+    let args = args |> with_loc in
     let expr = make_semantic_action_code action in
     PP.{ name = semantic_action_id action id; args; expr; comment = None }
   ;;
 
   let make_semantic_actions actions =
     let bindings = IntMap.bindings actions |> List.map make_semantic_action in
-    PP.StructLet (PP.NonRecursive, true, bindings)
+    if IntMap.cardinal actions = 0
+    then PP.StructVerbatim (verbatim "(* No actions *)")
+    else PP.StructLet (PP.NonRecursive, true, bindings)
   ;;
 
   let make_args_ids symbols =
@@ -306,16 +296,17 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
   let make_goto_call state sym =
     let closure = state.s_kernel @ state.s_closure
     and callee = state_id (SymbolMap.find sym state.s_goto) in
-    let valu = if symbol_has_value sym then [ PP.ExprId "x" ] else []
+    let tok = [ PP.ExprId "t" ]
+    and valu = if symbol_has_value sym then [ PP.ExprId "x" ] else []
     and args = make_args_ids (List.find (shifts_group sym) closure).g_prefix
     and const = make_cont_ids (shifts_group sym) closure in
-    PP.ExprCall (callee, valu @ args @ const |> with_loc)
+    PP.ExprCall (callee, tok @ valu @ args @ const |> with_loc)
   ;;
 
   let make_continuation state group idx =
     let sym = NTerm group.g_symbol in
     let name = cont_id group idx
-    and args = [ PP.ExprId "x" ] |> with_loc
+    and args = [ PP.ExprId "t"; PP.ExprId "x" ] |> with_loc
     and body = make_goto_call state sym in
     PP.{ name; args; expr = body; comment = None }
   ;;
@@ -354,12 +345,12 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
       | false -> [ term_name sym, None ]
     in
     let shift = PP.ExprVerbatim [ verbatim "shift ()" ]
-    and locs = PP.ExprVerbatim [ verbatim "loc_shift ~_loc _l" ]
+    and locs = PP.ExprVerbatim [ verbatim "loc_shift ~_loc (snd t)" ]
     and comment = if S.comments then Some " Shift " else None in
     let expr =
       let expr = make_goto_call state (Term sym) in
-      let expr = if S.locations then make_var "_loc" locs expr else expr in
-      make_var "_, _l" shift expr
+      let expr = make_var "t" shift expr in
+      if S.locations then make_var "_loc" locs expr else expr
     in
     PP.{ patterns; cexpr = expr; ccomment = comment }
   ;;
@@ -377,7 +368,8 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     and comment = if S.comments then Some " Reduce " else None
     and locs = PP.ExprVerbatim [ Printf.sprintf "loc_reduce ~_loc %d" n |> verbatim ] in
     let expr =
-      let expr = PP.ExprCall (cont_id group i, [ PP.ExprId "x" ] |> with_loc) in
+      let args = [ PP.ExprId "t"; PP.ExprId "x" ] |> with_loc in
+      let expr = PP.ExprCall (cont_id group i, args) in
       let vars = if S.locations then [ "_loc", locs; "x", call ] else [ "x", call ] in
       make_vars vars expr
     in
@@ -395,7 +387,7 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
       |> TermSet.elements
       |> List.map (fun t -> term_name t |> Printf.sprintf "%S")
       |> String.concat "; "
-      |> Printf.sprintf "fail [ %s ]"
+      |> Printf.sprintf "fail t [ %s ]"
       |> verbatim
     in
     PP.{ patterns = [ "_", None ]; cexpr = PP.ExprVerbatim [ failure ]; ccomment = None }
@@ -404,13 +396,13 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
   let make_actions state =
     let cases = List.concat_map (fun (l, m) -> make_action state l m) state.s_action
     and failure = make_action_failure state in
-    PP.ExprMatch (PP.ExprCall ("lookahead", [ PP.ExprUnit ]), cases @ [ failure ])
+    PP.ExprMatch (PP.ExprCall ("fst", [ PP.ExprId "t" ]), cases @ [ failure ])
   ;;
 
   let make_starting_actions state =
     let group = List.hd state.s_kernel in
     let item = List.nth group.g_items 0 in
-    let expr = PP.ExprCall (cont_id group 0, [ PP.ExprId "x" ]) in
+    let expr = PP.ExprCall (cont_id group 0, [ PP.ExprId "t"; PP.ExprId "x" ]) in
     let expr = make_var "x" (make_semantic_action_call group item) expr in
     expr
   ;;
@@ -443,22 +435,27 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
 
   let make_state (id, state) =
     let name = state_id id
-    and args = make_args_ids (List.hd state.s_kernel).g_prefix |> with_loc
+    and tok = [ PP.ExprId "t" ]
+    and args = make_args_ids (List.hd state.s_kernel).g_prefix
     and cont = make_cont_ids (Fun.const true) state.s_kernel
     and body = make_state_body state
     and comment = if S.comments then Some (make_state_comment state) else None in
-    PP.{ name; args = args @ cont; expr = body; comment }
+    PP.{ name; args = tok @ args @ cont |> with_loc; expr = body; comment }
   ;;
 
   let make_states states =
-    PP.StructLet (PP.Recursive, false, IntMap.bindings states |> List.map make_state)
+    if IntMap.cardinal states = 0
+    then PP.StructVerbatim (verbatim "(* No states *)")
+    else PP.StructLet (PP.Recursive, false, IntMap.bindings states |> List.map make_state)
   ;;
 
   let make_entry symbol id =
     let state = Printf.sprintf "States.%s" (state_id id)
     and args = [ PP.ExprId "lexfun"; PP.ExprId "lexbuf" ]
-    and setup = PP.ExprVerbatim [ verbatim "States.setup lexfun lexbuf" ] in
-    let expr = PP.ExprCall (state, [ PP.ExprId "Fun.id" ] |> with_loc) in
+    and setup = PP.ExprVerbatim [ verbatim "States.setup lexfun lexbuf" ]
+    and cont = PP.ExprVerbatim [ verbatim "(fun _ x -> x)" ] in
+    let expr = PP.ExprCall (state, [ PP.ExprId "t"; cont ] |> with_loc) in
+    let expr = make_var "t" (PP.ExprVerbatim [ verbatim "States.shift ()" ]) expr in
     let expr = make_var "_loc" (PP.ExprVerbatim [ verbatim "[]" ]) expr in
     let expr = PP.ExprSeq [ setup; expr ] in
     let binding = PP.{ name = nterm_name symbol; args; expr; comment = None } in
