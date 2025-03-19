@@ -10,7 +10,7 @@ let expr =
     | Neg x -> Format.fprintf f "Neg (%a)" pp x
     | Int x -> Format.fprintf f "Int %d" x
   in
-  Alcotest.testable pp ( = )
+  Alcotest.of_pp pp
 ;;
 
 let suite parse =

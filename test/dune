@@ -9,22 +9,22 @@
   (run cpspg -o %{target} %{deps})))
 
 (test
- (name Param)
- (libraries alcotest))
-
-(rule
- (target ParamParser.ml)
- (deps Param.mly)
- (action
-  (run cpspg -o %{target} %{deps})))
-
-(test
  (name Inline)
  (libraries alcotest))
 
 (rule
  (target InlineParser.ml)
  (deps Inline.mly)
+ (action
+  (run cpspg -o %{target} %{deps})))
+
+(test
+ (name Param)
+ (libraries alcotest))
+
+(rule
+ (target ParamParser.ml)
+ (deps Param.mly)
  (action
   (run cpspg -o %{target} %{deps})))
 
@@ -37,6 +37,3 @@
  (deps When.mly)
  (action
   (run cpspg -o %{target} %{deps})))
-
-(cram
- (deps Syntax.mly))

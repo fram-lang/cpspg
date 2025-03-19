@@ -1,2 +1,17 @@
 (cram
- (deps Tokens.mly))
+ (deps
+  (glob_files *.ml)
+  (glob_files *.mly)
+  (glob_files *.txt)
+  Locations.exe))
+
+(ocamllex LocationsLexer)
+
+(rule
+ (target LocationsParser.ml)
+ (deps LocationsParser.mly)
+ (action
+  (run cpspg %{deps} %{target})))
+
+(executable
+ (name Locations))
