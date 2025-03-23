@@ -11,10 +11,16 @@
         pkgs = nixpkgs.legacyPackages.${system};
         on = opam-nix.lib.${system};
         scope =
-          on.buildOpamProject { } package ./. { ocaml-system = "*"; };
+          on.buildDuneProject { resolveArgs.with-test = true; } package ./. { ocaml-base-compiler = "*"; };
         overlay = final: prev:
           {
             # Your overrides go here
+            cpspg = prev.cpspg.override {
+              doCheck = true;
+              checkPhase = ''
+                dune runtest
+              '';
+            };
 
           };
       in rec {
@@ -25,23 +31,8 @@
           cpspg = default;
         };
 
-        devShells.default = with pkgs; pkgs.mkShell {
-          buildInputs = [ 
-              # Source file formatting
-              nixpkgs-fmt
-              ocamlformat
-              # For `dune build --watch ...`
-              fswatch
-              # For `dune build @doc`
-              ocamlPackages.odoc
-              # OCaml editor support
-              ocamlPackages.ocaml-lsp
-              # Nicely formatted types on hover
-              ocamlPackages.ocamlformat-rpc-lib
-              # Fancy REPL thing
-              ocamlPackages.utop
-              legacyPackages.cpspg
-          ];
+        devShells.default = pkgs.mkShell {
+          buildInputs = packages.default.buildInputs;
         };
       });
 }

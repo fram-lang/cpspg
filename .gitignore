@@ -30,3 +30,6 @@ _opam/
 
 # nix result symlink
 result
+
+# direnv symlinks for dev environments
+.direnv
