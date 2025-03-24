@@ -152,9 +152,10 @@ let loc_dummy = function
 let loc_reduce ~_loc = function
   | 0 -> loc_dummy _loc :: _loc
   | n ->
+    let rec drop n xs = if n <= 0 then xs else drop (n - 1) (List.tl xs) in
     let l = fst (List.nth _loc (n - 1)), snd (List.hd _loc) in
     ParsingCompat.set_loc _loc n;
-    l :: List.drop n _loc
+    l :: drop n _loc
 ;;
 |} |> verbatim
 [@@ocamlformat "disable"]
@@ -377,7 +378,8 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
   ;;
 
   let make_action state lookahead = function
-    | Shift -> TermSet.to_list lookahead |> List.map (make_action_shift state)
+    | Shift ->
+      TermSet.to_seq lookahead |> Seq.map (make_action_shift state) |> List.of_seq
     | Reduce (i, j) -> [ make_action_reduce state lookahead i j ]
   ;;
 

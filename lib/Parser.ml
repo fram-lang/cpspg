@@ -63,19 +63,19 @@ module Actions = struct
   let _kw_loc ~_loc n = _kw_startpos ~_loc n, _kw_endpos ~_loc n
   let _kw_sloc ~_loc _ = failwith "not implemented: $sloc"
 
-  let a0 ~_loc data () = ({ span =(_kw_loc ~_loc 1); data })
+  let a0 ~_loc data () = ( { span = (_kw_loc ~_loc 1); data } )
   and a1 ~_loc data () = (DeclCode data)
-  and a2 ~_loc _arg1 () = (_arg1)
+  and a2 ~_loc _arg1 () = ( _arg1 )
   and a3 ~_loc () = (None)
   and a4 ~_loc x () = (Some x)
-  and a5 ~_loc _arg1 () = (_arg1)
+  and a5 ~_loc _arg1 () = ( _arg1 )
   and a6 ~_loc () = ([])
   and a7 ~_loc xs x () = (x :: xs)
   and a8 ~_loc xs tp _arg1 () = (DeclToken (tp, xs))
-  and a9 ~_loc _arg1 () = (_arg1)
+  and a9 ~_loc _arg1 () = ( _arg1 )
   and a10 ~_loc xs tp _arg1 () = (DeclStart (tp, xs))
-  and a11 ~_loc x () = ({ span =(_kw_loc ~_loc 1); data = NTerm x })
-  and a12 ~_loc x () = ({ span =(_kw_loc ~_loc 1); data = Term x })
+  and a11 ~_loc x () = ( { span = (_kw_loc ~_loc 1); data = NTerm x } )
+  and a12 ~_loc x () = ( { span = (_kw_loc ~_loc 1); data = Term x } )
   and a13 ~_loc xs tp _arg1 () = (DeclType  (tp, xs))
   and a14 ~_loc x () = (x)
   and a15 ~_loc x () = (x)
@@ -99,7 +99,7 @@ module Actions = struct
   and a33 ~_loc _arg1 () = (qmark)
   and a34 ~_loc a_symbol a_actual () = ({ a_symbol; a_args = [ Arg a_actual ] })
   and a35 ~_loc x () = (Arg x)
-  and a36 ~_loc _arg1 () = (_arg1)
+  and a36 ~_loc _arg1 () = ( _arg1 )
   and a37 ~_loc a_action a_prod () = (ArgInline { a_prod; a_action })
   and a38 ~_loc _arg3 args _arg1 () = (args)
   and a39 ~_loc a_args a_symbol () = ({ a_symbol; a_args })
@@ -151,9 +151,10 @@ module States = struct
   let loc_reduce ~_loc = function
     | 0 -> loc_dummy _loc :: _loc
     | n ->
+      let rec drop n xs = if n <= 0 then xs else drop (n - 1) (List.tl xs) in
       let l = fst (List.nth _loc (n - 1)), snd (List.hd _loc) in
       ParsingCompat.set_loc _loc n;
-      l :: List.drop n _loc
+      l :: drop n _loc
   ;;
 
   (*

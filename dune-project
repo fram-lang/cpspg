@@ -13,4 +13,7 @@
 (package
  (name cpspg)
  (synopsis "Continuation-passing style parser generator")
- (depends ocaml dune (alcotest :with-test)))
+ (depends
+  (ocaml (>= 5.0))
+  dune
+  (alcotest :with-test)))
