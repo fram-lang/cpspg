@@ -231,7 +231,7 @@ module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
       | VSymbol s -> prepend_one s sym, prepend_one None arg
       | VInline items ->
         let s = List.map (fun i -> i.i_suffix) items
-        and a = List.map (fun i -> [ Some i.i_action ]) items in
+        and a = List.map (fun i -> [ i.i_action ]) items in
         prepend_some s sym, prepend_some a arg
     in
     let sym, arg = List.fold_left f ([ [] ], [ [] ]) values in
@@ -268,7 +268,7 @@ module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
       | Some action ->
         let action = { ac_id = action; ac_args = args }
         and prec = Option.bind prod.p_prec get_prec in
-        Some { i_suffix = suffix; i_action = action; i_prec = prec }
+        Some { i_suffix = suffix; i_action = Some action; i_prec = prec }
       | None -> None
     in
     let sym, arg = tr_values values in
@@ -348,7 +348,11 @@ module Run (S : Types.BackendSettings) (R : Types.Raw) : Types.Grammar = struct
 
   let term =
     let term = Hashtbl.to_seq_values term |> TermMap.of_seq in
-    fun t -> TermMap.find t term
+    let unnamed = Raw.{ span = Lexing.dummy_pos, Lexing.dummy_pos; data = "" } in
+    let dummy = { ti_ty = None; ti_name = unnamed; ti_prec = None } in
+    function
+    | t when t = Terminal.dummy || t = Terminal.eof -> dummy
+    | t -> TermMap.find t term
   ;;
 
   (* Collect all non-terminals and groups, also attach missing precedence levels to items. *)

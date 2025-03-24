@@ -187,6 +187,15 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     | Term t -> (G.term t).ti_ty |> Option.is_some
   ;;
 
+  (** Checks whether this is the last shift before end-of-stream is (possibly) reached *)
+  let is_eof_shift state sym =
+    let closure = state.s_kernel @ state.s_closure in
+    let group = List.find (shifts_group (Symbol.Term sym)) closure in
+    let item = List.find (shifts_item (Symbol.Term sym)) group.g_items in
+    List.length item.i_suffix = 1
+    && TermSet.equal group.g_lookahead (TermSet.singleton Terminal.eof)
+  ;;
+
   (* Identifiers *)
 
   let arg_id symbol idx =
@@ -332,11 +341,16 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     List.rev_append acc [ PP.ExprUnit ]
   ;;
 
-  let make_semantic_action_call group { i_action = a; _ } =
-    let action = IntMap.find a.ac_id A.automaton.a_actions in
-    let name = semantic_action_id action a.ac_id |> Printf.sprintf "Actions.%s" in
-    let args = make_semantic_action_args a.ac_args group.g_prefix |> with_loc in
-    PP.ExprCall (name, args)
+  let make_semantic_action_call group = function
+    | { i_action = None; _ } ->
+      let args = make_args_ids group.g_prefix in
+      assert (List.length args = 1);
+      List.hd args
+    | { i_action = Some a; _ } ->
+      let action = IntMap.find a.ac_id A.automaton.a_actions in
+      let name = semantic_action_id action a.ac_id |> Printf.sprintf "Actions.%s" in
+      let args = make_semantic_action_args a.ac_args group.g_prefix |> with_loc in
+      PP.ExprCall (name, args)
   ;;
 
   let make_action_shift state sym =
@@ -350,7 +364,9 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     and comment = if S.comments then Some " Shift " else None in
     let expr =
       let expr = make_goto_call state (Term sym) in
-      let expr = make_var "t" shift expr in
+      (* When, after shifting we can reach the end of stream, we should not look at the token that follows.
+         Instead, let's reuse the token that we already have, because we shouldn't look at it anyway *)
+      let expr = if is_eof_shift state sym then expr else make_var "t" shift expr in
       if S.locations then make_var "_loc" locs expr else expr
     in
     PP.{ patterns; cexpr = expr; ccomment = comment }
@@ -361,6 +377,7 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
     let n, item = List.length group.g_prefix, List.nth group.g_items j in
     let pattern sym =
       match symbol_has_value (Term sym) with
+      | _ when sym = Terminal.eof -> "_", None
       | true -> term_name sym, Some "_"
       | false -> term_name sym, None
     in

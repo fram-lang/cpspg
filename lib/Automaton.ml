@@ -2,6 +2,7 @@ module Terminal : sig
   type t
 
   val dummy : t
+  val eof : t
   val compare : t -> t -> int
   val of_int : int -> t
   val to_int : t -> int
@@ -9,6 +10,7 @@ end = struct
   type t = int
 
   let dummy = -1
+  let eof = Int.max_int
   let compare = ( - )
   let of_int x = x
   let to_int x = x
@@ -60,14 +62,18 @@ type prec = int * int
      a value of inlined rule
   *)
 type semantic_action_call =
-  { ac_id : int
+  { ac_id : int (** Id of the action code *)
   ; ac_args : semantic_action_call option list
+    (** Args passed to the action. When [None], argument value shuld be passed
+        directly from symbol semantic value. Otherwise, it should be
+        the resuld of calling other semantic action (from inlined rule) *)
   }
 
 (** Suffix of LR(0)/LR(1) *)
 type item =
   { i_suffix : symbol list
-  ; i_action : semantic_action_call
+  ; i_action : semantic_action_call option
+    (** Semantic action call, [None] for "accept" action *)
   ; i_prec : prec option
   }
 
@@ -174,4 +180,25 @@ let shift_state symbol state =
   | [] -> None
   | kernel ->
     Some { s_kernel = kernel; s_closure = []; s_goto = SymbolMap.empty; s_action = [] }
+;;
+
+let item_of_starting_sym sym =
+  { i_suffix = [ NTerm sym ]; i_action = None; i_prec = None }
+;;
+
+let group_of_starting_sym sym =
+  { g_symbol = sym
+  ; g_prefix = []
+  ; g_items = [ item_of_starting_sym sym ]
+  ; g_lookahead = TermSet.singleton Terminal.eof
+  ; g_starting = true
+  }
+;;
+
+let state_of_starting_sym sym =
+  { s_kernel = [ group_of_starting_sym sym ]
+  ; s_closure = []
+  ; s_goto = SymbolMap.empty
+  ; s_action = []
+  }
 ;;

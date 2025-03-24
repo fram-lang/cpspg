@@ -109,9 +109,13 @@ end = struct
     if SymbolMap.equal TermSet.equal follow follow' then follow else loop follow'
   ;;
 
-  let init s = s, TermSet.empty
-  let dummy = Term Terminal.dummy
-  let follow = List.to_seq (dummy :: G.symbols) |> Seq.map init |> SymbolMap.of_seq
+  let init = function
+    | Symbol.NTerm n when (G.nterm n).ni_starting ->
+      Symbol.NTerm n, TermSet.singleton Terminal.eof
+    | s -> s, TermSet.empty
+  ;;
+
+  let follow = List.to_seq G.symbols |> Seq.map init |> SymbolMap.of_seq
   let follow = loop follow
   let follow sym = SymbolMap.find_opt sym follow |> Option.value ~default:TermSet.empty
 end
@@ -181,7 +185,7 @@ module Run (S : Types.BackendSettings) (G : Types.Grammar) : Types.Automaton = s
   let states = Hashtbl.create 128
 
   (** Visits freshly created state `state`, traverses its children
-      and returns same state with but added children links. *)
+      and returns same state but with added children links. *)
   let rec visit_state state =
     let state = closure ~lookahead:(S.kind = LR1) state in
     let fold_goto shift symbol =
@@ -206,9 +210,7 @@ module Run (S : Types.BackendSettings) (G : Types.Grammar) : Types.Automaton = s
   let starting =
     let add_init_symbol = function
       | NTerm n when (G.nterm n).ni_starting ->
-        let s_kernel = [ { (G.group n) with g_starting = true } ]
-        and s_closure = [] in
-        let state = { s_kernel; s_closure; s_goto = SymbolMap.empty; s_action = [] } in
+        let state = state_of_starting_sym n in
         Some (n, register_state state)
       | NTerm _ | Term _ -> None
     in
@@ -253,7 +255,7 @@ module Run (S : Types.BackendSettings) (G : Types.Grammar) : Types.Automaton = s
 
   let lookahead =
     match S.kind with
-    (* LR0 grammars doesn't have any lookaheads *)
+    (* LR0 grammars don't have any lookaheads *)
     | LR0 ->
       let module L = LR0 () in
       fun _ -> L.lookahead

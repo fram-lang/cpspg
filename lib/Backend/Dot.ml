@@ -11,7 +11,12 @@ module Make (S : Types.BackEndSettings) (G : Types.Grammar) (A : Types.Automaton
   DotCode = struct
   open Automaton
 
-  let term_name t = if t == Terminal.dummy then "<DUMMY>" else (G.term t).ti_name.data
+  let term_name = function
+    | t when t == Terminal.dummy -> "<DUMMY>"
+    | t when t == Terminal.eof -> "$"
+    | t -> (G.term t).ti_name.data
+  ;;
+
   let nterm_name n = (G.nterm n).ni_name.data
 
   let fmt_arg f = function
