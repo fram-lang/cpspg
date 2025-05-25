@@ -2,8 +2,9 @@ module IntMap = Map.Make (Int)
 module SymbolMap = Map.Make (Automaton.Symbol)
 
 let action_lib =
-  "  implicit ~loc\n\
-  \  implicit ~error {E_err} : Parsing.Error E_err\n\n\
+  "  parameter ~loc\n\
+  \  parameter E_err\n\
+  \  parameter ~error : Parsing.Error E_err\n\n\
   \  pub let _kw_endpos _ =\n\
   \    match ~loc with\n\
   \    | l :: _ => snd l\n\
@@ -24,30 +25,29 @@ let action_lib =
 ;;
 
 let state_lib =
-  "  let lexfun {E_err, E_st, R_lex,\n\
+  "  let lexfun {E_err, E_st, E_lex,\n\
   \              ~error : Parsing.Error E_err,\n\
   \              ~st : State2 E_st,\n\
-  \              ~lex : Parsing.Lex R_lex Tok} () = \n\
-  \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+  \              ~lex : Parsing.Lex E_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st, E_lex] Tok) = \n\
   \    fn () => ~lex.token ()\n\
   \    in aux ()\n\n\
-  \  let shift {E_err, E_st, R_lex,\n\
+  \  let shift {E_err, E_st, E_lex,\n\
   \             ~error : Parsing.Error E_err,\n\
   \             ~st : State2 E_st,\n\
-  \             ~lex : Parsing.Lex R_lex Tok} () = \n\
-  \    let (aux : Unit ->[E_err, E_st|R_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
+  \             ~lex : Parsing.Lex E_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st, E_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = \n\
   \      (fn () => \n\
-  \        let sym = Utils.optionGet {~re = (fn () => Parsing.error \"option\")}\n\
-  \                  (getPeeked ()) in\n\
+  \        let sym = (getPeeked ()).unwrapErr {~onError = fn () => Parsing.error \"option\"} in\n\
   \        let () = setPeeked None in\n\
   \        let () = setFallback (~lex.curPos ()) in\n\
   \        sym)\n\
   \    in aux ()\n\n\
-  \  let lookahead {E_err, E_st, R_lex,\n\
+  \  let lookahead {E_err, E_st, E_lex,\n\
   \                 ~error : Parsing.Error E_err,\n\
   \                 ~st : State2 E_st,\n\
-  \                 ~lex : Parsing.Lex R_lex Tok} () = \n\
-  \    let (aux : Unit ->[E_err, E_st|R_lex] Tok) = \n\
+  \                 ~lex : Parsing.Lex E_lex Tok} () = \n\
+  \    let (aux : Unit ->[E_err, E_st, E_lex] Tok) = \n\
   \      (fn () => \n\
   \        match getPeeked () with\n\
   \        | Some (tok, _) => tok\n\
@@ -58,13 +58,13 @@ let state_lib =
   \          tok\n\
   \        end)\n\
   \    in aux ()\n\n\
-  \  implicit ~loc\n\
+  \  parameter ~loc\n\
   \  let loc_shift l = l :: ~loc\n\n\
-  \  let loc_reduce {E_err, E_st, R_lex,\n\
+  \  let loc_reduce {E_err, E_st, E_lex,\n\
   \                  ~error : Parsing.Error E_err,\n\
   \                  ~st : State2 E_st,\n\
-  \                  ~lex : Parsing.Lex R_lex Tok} n =\n\
-  \    let (aux : Int ->[E_err, E_st|R_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
+  \                  ~lex : Parsing.Lex E_lex Tok} n =\n\
+  \    let (aux : Int ->[E_err, E_st, E_lex] List (Pair Parsing.Pos Parsing.Pos)) = \n\
   \      (fn (n : Int) =>\n\
   \        if n == 0 then (getFallback (), getFallback ()) :: ~loc\n\
   \        else\n\
@@ -80,9 +80,12 @@ let state_lib =
   \                         ~loc)) in\n\
   \           l :: skip n ~loc))\n\
   \    in aux n\n\n\
-  \  implicit ~lex {R_lex} : Parsing.Lex R_lex Tok\n\
-  \  implicit ~st {E_st} : State2 E_st\n\
-  \  implicit ~error {E_err} : Parsing.Error E_err\n\n"
+  \  parameter R_lex\n\
+  \  parameter ~lex : Parsing.Lex R_lex Tok\n\
+  \  parameter E_st\n\
+  \  parameter ~st : State2 E_st\n\
+  \  parameter E_err\n\
+  \  parameter ~error : Parsing.Error E_err\n\n"
 ;;
 
 let iteri2 f xs ys =
@@ -403,19 +406,19 @@ struct
     Format.fprintf
       f
       "import Parsing\n\
-       import Utils\n\
        import List\n\
-       implicit ~error {E_err} : Parsing.Error E_err\n\
+       parameter E_err\n\
+       parameter ~error : Parsing.Error E_err\n\
        %t\n\n\
-       %tdata State2 (effect E) = State2 of\n\
+       %tdata State2 E = State2 of\n\
       \  { setPeeked : Option (Pair Tok (Pair Parsing.Pos Parsing.Pos)) ->[E] Unit\n\
       \  , setFallback : Parsing.Pos ->[E] Unit\n\
       \  , getPeeked : Unit ->[E] Option (Pair Tok (Pair Parsing.Pos Parsing.Pos))\n\
       \  , getFallback : Unit ->[E] Parsing.Pos }\n\n\
-       method setPeeked {E, self = State2 {setPeeked} : State2 E} = setPeeked\n\
-       method getPeeked {E, self = State2 {getPeeked} : State2 E} = getPeeked\n\
-       method setFallback {E, self = State2 {setFallback} : State2 E} = setFallback\n\
-       method getFallback {E, self = State2 {getFallback} : State2 E} = getFallback\n\n\
+       method setPeeked {E} (State2 {setPeeked} : State2 E) = setPeeked\n\
+       method getPeeked {E} (State2 {getPeeked} : State2 E) = getPeeked\n\
+       method setFallback {E} (State2 {setFallback} : State2 E) = setFallback\n\
+       method getFallback {E} (State2 {getFallback} : State2 E) = getFallback\n\n\
        let setPeeked {E, ~st : State2 E} p = ~st.setPeeked p\n\
        let getPeeked {E, ~st : State2 E} () = ~st.getPeeked ()\n\
        let setFallback {E, ~st : State2 E} f = ~st.setFallback f\n\

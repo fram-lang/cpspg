@@ -1,7 +1,7 @@
 %{
 let fail () = Parsing.error "arithmetic error"
 
-let rec pow {~re : {type X} -> Unit ->[|_] X} (a : Int) (n : Int) =
+let rec pow {~re : {type X} -> Unit ->[_] X} (a : Int) (n : Int) =
 	if n == 0 then 1
 	else if n == 1 then a
 	else (let (b : Int) = pow a (n / 2) in

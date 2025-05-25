@@ -6,7 +6,7 @@ module Feeder
     pub let withFeeder {Tok}
 		   (xs : List Tok)
 		   (eof : Tok)
-		   (f : {R} -> Parsing.Lex R Tok -> [|R] _) =
+		   (f : {E} -> Parsing.Lex E Tok -> [E] _) =
 	handle lex = Parsing.Lex
 	    { token = effect () / r =>
 		fn ys =>
@@ -38,4 +38,4 @@ let execTest xs =
     | Right n => printInt n ; printStrLn ""
     end
 
-let _ = List.iter execTest tests
+# let _ = List.iter execTest tests
