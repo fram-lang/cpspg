@@ -11,13 +11,14 @@ module Feeder
       { token = effect () / r =>
           fn ys =>
             match ys with
-	    | [] => r eof ys
-	    | y :: ys => r y ys
-	    end
+            | [] => r eof ys
+            | y :: ys => r y ys
+            end
       , curPos = effect () / r => fn ys => r Parsing.dummyPos ys
-      , startPos = effect () / r => fn ys => r Parsing.dummyPos ys }
-      return x => fn _ => x
-      finally f => f xs
+      , startPos = effect () / r => fn ys => r Parsing.dummyPos ys
+      }
+    return x => fn _ => x
+    finally f => f xs
     in f lex
 end
 
