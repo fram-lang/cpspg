@@ -23,8 +23,6 @@ let filter_mapi f xs =
 let prelude = {|
 import Parsing
 import List
-parameter E_err
-parameter ~error : Parsing.Error E_err
 |} |> verbatim
 [@@ocamlformat "disable"]
 
@@ -34,16 +32,16 @@ parameter E_err
 parameter ~error : Parsing.Error E_err
 
 pub let _kw_endpos _ =
-match ~loc with
-| l :: _ => snd l
-| [] => Parsing.dummyPos
-end
+  match ~loc with
+  | l :: _ => snd l
+  | [] => Parsing.dummyPos
+  end
 
 pub let _kw_startpos (n : Int) =
-match List.nth ~loc (n - 1) with
-| Some l => fst l
-| None => _kw_endpos n
-end
+  match List.nth ~loc (n - 1) with
+  | Some l => fst l
+  | None => _kw_endpos n
+  end
 
 pub let _kw_symbolstartpos _ = Parsing.error "unimplemented: $symbolstartpos"
 pub let _kw_startofs _ = Parsing.error "unimplemented: $startofs"
@@ -55,16 +53,20 @@ pub let _kw_sloc _ = Parsing.error "unimplemented: $sloc"
 [@@ocamlformat "disable"]
 
 let state_lib = {|
-let lexfun {E_err, E_lex,
-            ~error : Parsing.Error E_err,
-            ~lex : Parsing.Lex E_lex Tok} ppos = 
+let lexfun 
+    {E_err, E_lex
+    , ~error : Parsing.Error E_err
+    , ~lex : Parsing.Lex E_lex Tok
+    } ppos = 
   let (aux : Unit ->[E_err, E_lex] Tok) = 
   fn () => ~lex.token ppos 
   in aux ()
 
-pub let shift {E_err, E_lex,
-           ~error : Parsing.Error E_err,
-           ~lex : Parsing.Lex E_lex Tok} () = 
+pub let shift 
+        {E_err, E_lex
+        , ~error : Parsing.Error E_err
+        , ~lex : Parsing.Lex E_lex Tok
+        } () = 
   let (aux : Unit ->[E_err, E_lex] Pair Tok (Pair Parsing.Pos Parsing.Pos)) = 
     (fn () => 
       let tok = lexfun () in
@@ -82,9 +84,11 @@ let locDummy xs =
   | (_, e) :: _ => (e, e)
   end
 
-let locReduce {E_err, E_lex,
-                ~error : Parsing.Error E_err,
-                ~lex : Parsing.Lex E_lex Tok} n =
+let locReduce 
+    {E_err, E_lex
+    , ~error : Parsing.Error E_err
+    , ~lex : Parsing.Lex E_lex Tok
+    } n =
   let (aux : Int ->[E_err, E_lex] List (Pair Parsing.Pos Parsing.Pos)) = 
     (fn (n : Int) =>
       if n == 0 then locDummy ~loc :: ~loc

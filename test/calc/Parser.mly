@@ -1,11 +1,12 @@
 %{
-let fail () = Parsing.error "arithmetic error"
+let fail {E_err, ~error : Parsing.Error E_err} () =
+  Parsing.error "arithmetic error"
 
 let rec pow {~re : {type X} -> Unit ->[_] X} (a : Int) (n : Int) =
-	if n == 0 then 1
-	else if n == 1 then a
-	else (let (b : Int) = pow a (n / 2) in
-	b * b * (if n % 2 == 0 then 1 else a))
+  if n == 0 then 1
+  else if n == 1 then a
+  else (let (b : Int) = pow a (n / 2) in
+    b * b * (if n % 2 == 0 then 1 else a))
 %}
 
 %token<Int> INT
