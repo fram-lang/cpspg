@@ -1,0 +1,10 @@
+(rule
+ (deps Parser.mly)
+ (target Parser.fram)
+ (action
+  (run cpspg -o %{target} %{deps})))
+
+(rule
+  (alias runtest)
+  (deps SExpr.fram Parser.fram (source_tree ../../framtools))
+  (action (run dbl -I ../../framtools SExpr.fram)))

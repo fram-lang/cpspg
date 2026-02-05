@@ -238,3 +238,220 @@ module Ml (S : Types.BackEndSettings) = struct
 
   and pp_structures xs = iter_sep pp_structure print_newline xs
 end
+
+
+module Fram (S : Types.BackEndSettings) = struct
+  include Make (S)
+
+  type public = 
+    | Public
+    | Private
+
+  type recursive = 
+    | Recursive
+    | NonRecursive
+
+  type expr =
+    | ExprUnit
+    | ExprId of string
+    | ExprCall of string * expr list
+    | ExprLabeled of string
+    | ExprGrouped of expr
+    | ExprSeq of expr list
+    | ExprLet of recursive * binding list * expr
+    | ExprHandle of binding * expr
+    | ExprMatch of expr * case list
+    | ExprVerbatim of string Raw.node list
+
+  and binding = 
+    { name : string
+    ; named_args : expr list
+    ; args : expr list
+    ; expr : expr
+    ; comment : string option
+    }
+
+  and case =
+    { patterns : (string * string option) list
+    ; cexpr : expr
+    ; ccomment : string option
+    }
+
+  type constructor =
+    { name : string Raw.node
+    ; contents : string Raw.node option
+    }
+
+  type structure =
+    | StructVerbatim of string Raw.node
+    | StructType of public * recursive * string * constructor list
+    | StructLet of public * recursive * binding list
+    | StructModule of public * string * structure list
+
+  let if_pub public f g = 
+    match public with
+    | Public -> f ()
+    | Private -> g ()
+
+  let if_rec recursive f g = 
+    match recursive with
+    | Recursive -> f ()
+    | NonRecursive -> g ()
+
+  let pp_pub public = if_pub public (fun () -> "pub ") (fun () -> "")
+
+  let pp_rec recursive = if_rec recursive (fun () -> "rec ") (fun () -> "")
+
+  let pp_line_directive f l c = 
+    if not !at_newline then print_newline ();
+    Printf.sprintf "#@ %d %s\n%s" l f (String.make c ' ') |> output_string_raw
+  ;;
+    
+  let pp_string_node ?(trim = true) { Raw.span = loc, _; data } =
+    match loc with
+    | _ when (not S.line_directives) && trim -> output_string (String.trim data)
+    | _ when not S.line_directives -> output_string data
+    | loc when loc = Lexing.dummy_pos -> output_string data
+    | loc ->
+      pp_line_directive loc.pos_fname loc.pos_lnum (loc.pos_cnum - loc.pos_bol);
+      output_string_raw data;
+      pp_line_directive S.name (!line_number + 2) 0
+  ;;
+
+  let pp_comment = function
+    | None -> ()
+    | Some c ->
+      output_string "{#";
+      indented output_string c;
+      output_string "#}\n"
+  ;;
+
+  let rec pp_expr = function
+    | ExprUnit -> output_string "()"
+    | ExprId s -> output_string s
+    | ExprCall (callee, args) ->
+      let rest expr = 
+        output_string " ";
+        pp_expr expr
+      in
+      output_string callee;
+      List.iter rest args
+    | ExprLabeled s -> printf "~%s" s
+    | ExprGrouped expr ->
+      output_char '(';
+      pp_expr expr;
+      output_char ')'
+    | ExprSeq [] -> assert false
+    | ExprSeq (expr :: exprs) ->
+      let rest expr =
+        output_string ";\n";
+        pp_expr expr
+      in
+      pp_expr expr;
+      List.iter rest exprs
+    | ExprLet (_, [], expr) -> pp_expr expr
+    | ExprLet (recursive, bindings, expr) -> 
+      let binding_sep = if_rec recursive (fun () -> "\nlet ") (fun () -> " in\nlet ") in
+      if_rec recursive (fun () -> output_string "rec let ") (fun () -> output_string "let ");
+      iter_sep (pp_binding false) (fun () -> output_string binding_sep) bindings;
+      if_rec recursive (fun () -> output_string " end") (fun () -> ());
+      output_string " in\n";
+      pp_expr expr
+    | ExprHandle (binding, expr) -> 
+      output_string "handle ";
+      pp_binding false binding;
+      output_string " in\n";
+      pp_expr expr
+    | ExprMatch (expr, cases) -> 
+      output_string "match ";
+      pp_expr expr;
+      output_string " with\n";
+      iter_sep pp_case print_newline cases;
+      output_string "\nend\n"
+    | ExprVerbatim data -> 
+      let trim = List.length data = 1 in
+      List.iter (pp_string_node ~trim) data
+
+  and pp_binding bl { name; named_args; args; expr; comment = _ } = 
+    let pp_arg a =
+      output_char ' ';
+      pp_expr a
+    and pp_named_arg a = 
+      output_string ", ";
+      pp_expr a
+    in let pp_named_args nargs = 
+      match nargs with
+      | [] -> ()
+      | a :: nargs -> 
+        output_string " {";
+        pp_expr a;
+        List.iter pp_named_arg nargs;
+        output_char '}'
+    and pp_block_expr expr = 
+      print_newline ();
+      indented pp_expr expr;
+      print_newline ()
+    in
+    output_string name;
+    pp_named_args named_args;
+    List.iter pp_arg args;
+    output_string " = ";
+    if bl then pp_block_expr expr else pp_expr expr
+  
+  (* We have no disjunctions of patterns yet.
+     For now, this function copies the same right-hand-side expression
+     for each left-hand-side pattern in `patterns`. *)
+  and pp_case { patterns; cexpr; ccomment } = 
+    let pp_pattern = function
+      | name, None -> printf "| %s " name
+      | name, Some arg -> printf "| %s %s " name arg
+    in let pp_simple_case pattern =
+      pp_comment ccomment;
+      pp_pattern pattern;
+      output_string "=>\n";
+      indented pp_expr cexpr
+    in
+    iter_sep pp_simple_case print_newline patterns
+  ;;
+  
+  let pp_constructor { name; contents } = 
+    output_string "| ";
+    pp_string_node name;
+    match contents with
+    | None -> print_newline ()
+    | Some c -> 
+      output_string " of (";
+      pp_string_node c;
+      output_string ")\n"
+  ;;
+  
+  let rec pp_structure = function
+    | StructVerbatim text ->
+      pp_string_node text;
+      if not S.line_directives then print_newline ()
+    | StructType (public, recursive, name, constructors) ->
+      printf "%sdata %s%s =\n" (pp_pub public) (pp_rec recursive) name;
+      indented (List.iter pp_constructor) constructors
+    | StructLet (_, _, []) -> assert false
+    | StructLet (public, recursive, binding :: bindings) -> 
+      let pp_binding b1 b2 binding =
+        output_string b1;
+        pp_comment binding.comment;
+        output_string b2;
+        pp_binding true binding
+      in
+      let before = Printf.sprintf "%s%slet " (pp_pub public) (pp_rec recursive) in
+      pp_binding "" before binding;
+      List.iter
+        (pp_binding
+          "\n"
+          (if recursive = Recursive || public = Private then "let " else "pub let "))
+        bindings;
+      output_string (if_rec recursive (fun () -> "end\n") (fun () -> "\n"))
+    | StructModule (public, name, contents) -> 
+      printf "%smodule %s\n" (pp_pub public) name;
+      indented pp_structures contents;
+      output_string "end\n"
+  
+  and pp_structures xs = iter_sep pp_structure print_newline xs
+end
